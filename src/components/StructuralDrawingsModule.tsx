@@ -940,22 +940,9 @@ export default function StructuralDrawingsModule({
               </div>
             ` : ''}
 
-            <!-- Construction guidelines & notes
-                 General mode  : full plan width, no title block below, sits just above bottom edge
-                 Other modes   : narrow left column, above the title block (bottom:36px) -->
-            ${projectionMode === 'general' ? `
-            <div style="position:absolute; bottom:16px; left:45px; width:${planW - 10}px; height:130px; overflow:hidden; text-align:right; border:1px dashed #cbd5e1; padding:8px 14px; box-sizing:border-box; background:#fafcff;">
-              <h4 style="margin: 0 0 5px 0; font-size: 9.5px; font-weight: 800; color: #1e293b;">ملاحظات تنفيذية — مخطط القوالب والمحاور (Construction Notes — Formwork & Axes Plan)</h4>
-              <ul style="font-size: 7.5px; line-height: 1.55; padding-right: 16px; margin: 0; color: #475569; columns: 2; column-gap: 24px;">
-                <li>يتم مطابقة الأبعاد والارتفاعات مع المخططات المعمارية التنفيذية المعتمدة قبل مباشرة الصب.</li>
-                <li>قوة كسر الخرسانة المستهدفة للبلاطات والأعمدة f'c = 30 MPa (خرسانة مسلحة مقاومة للكبريتات).</li>
-                <li>إجهاد الخضوع لحديد التسليح عالي المقاومة fy = 420 MPa وفق ACI 318-19.</li>
-                <li>تؤخذ التراكيب ووصلات التداخل لحديد التسليح بطول لا يقل عن 60 ضعف قطر السيخ المستخدم.</li>
-                <li>المحافظة على غطاء خرساني لا يقل عن 25 مم للسقف، و40 مم للأعمدة والجسور.</li>
-                <li>تنفيذ القوالب الخشبية وفق أبعاد المقاطع المبيّنة في المخطط مع مراعاة فتحات الشبابيك والأبواب.</li>
-              </ul>
-            </div>
-            ` : `
+            <!-- Construction notes — only for slabs / beams / columns modes.
+                 General (formwork/axes) plan is drawing-only: no notes added here. -->
+            ${projectionMode !== 'general' ? `
             <div style="position:absolute; bottom:36px; left:45px; width:${innerW - 610}px; height:135px; overflow:hidden; text-align:right; border:1px dashed #cbd5e1; padding:8px 12px; box-sizing:border-box;">
               <h4 style="margin: 0 0 4px 0; font-size: 9.5px; font-weight: 800; color: #1e293b;">شروط هندسية وضوابط التنفيذ العامة (General Construction Notes)</h4>
               <ul style="font-size: 7.5px; line-height: 1.4; padding-right: 14px; margin: 0; color: #475569;">
@@ -966,11 +953,10 @@ export default function StructuralDrawingsModule({
                 <li>المحافظة على غطاء خرساني لا يقل عن 25 مم للسقف، و40 مم للأعمدة والجسور.</li>
               </ul>
             </div>
-            `}
+            ` : ''}
 
-            <!-- Title block — shown for all modes EXCEPT the formwork/axes plan (S-101).
-                 General mode has no title block; the notes span the full bottom instead. -->
-            ${projectionMode !== 'general' ? htmlTitleBlock(titleBlockConfig as any) : ''}
+            <!-- Title block — always present on all modes including the formwork/axes plan. -->
+            ${htmlTitleBlock(titleBlockConfig as any)}
           </div>
           <script>
             window.onload = function() {
