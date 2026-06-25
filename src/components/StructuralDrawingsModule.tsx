@@ -731,10 +731,12 @@ export default function StructuralDrawingsModule({
     const drawnW = cadFloorBounds.w * scaleCad;
     const drawnH = cadFloorBounds.h * scaleCad;
 
-    // Horizontally, crop to the floor plan area with axis bubbles and dimension text.
-    // Cap at 462px to avoid revealing the SVG schedule/section content in the right 275px zone.
+    // Horizontally, crop to the floor plan area with axis bubbles
+    // General formwork/axes plan (S-101): expand viewport to full plan width — no schedule column on right
     const minPixelX = Math.max(5, offsetCadX - 55);
-    const maxPixelX = Math.min(462, offsetCadX + drawnW + 45);
+    const maxPixelX = projectionMode === 'general'
+      ? Math.min(710, offsetCadX + drawnW + 60)
+      : Math.min(462, offsetCadX + drawnW + 45);
 
     // Vertically, provide perfect pads on both top (dimensions) and bottom (bubbles)
     const minPixelY = Math.max(5, cadHeight - (offsetCadY + drawnH + 52));
@@ -940,9 +942,8 @@ export default function StructuralDrawingsModule({
               </div>
             ` : ''}
 
-            <!-- Construction notes — only for slabs / beams / columns modes.
-                 General (formwork/axes) plan is drawing-only: no notes added here. -->
             ${projectionMode !== 'general' ? `
+            <!-- General construction guidelines & notes (omitted on formwork/axes plan per drawing standard) -->
             <div style="position:absolute; bottom:36px; left:45px; width:${innerW - 610}px; height:135px; overflow:hidden; text-align:right; border:1px dashed #cbd5e1; padding:8px 12px; box-sizing:border-box;">
               <h4 style="margin: 0 0 4px 0; font-size: 9.5px; font-weight: 800; color: #1e293b;">شروط هندسية وضوابط التنفيذ العامة (General Construction Notes)</h4>
               <ul style="font-size: 7.5px; line-height: 1.4; padding-right: 14px; margin: 0; color: #475569;">
@@ -955,7 +956,7 @@ export default function StructuralDrawingsModule({
             </div>
             ` : ''}
 
-            <!-- Title block — always present on all modes including the formwork/axes plan. -->
+            <!-- Pre-rendered high-fidelity classical Title Block matching foundation drawing sheets -->
             ${htmlTitleBlock(titleBlockConfig as any)}
           </div>
           <script>
