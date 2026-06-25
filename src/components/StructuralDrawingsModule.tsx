@@ -2206,17 +2206,20 @@ export default function StructuralDrawingsModule({
                         {/* ==============================================================================
                             ARABIC: عمود جداول التسليح والمقاطع التفصيلية داخل المخطط الإنتقالي الذكي CAD
                             ============================================================================== */}
-                        {/* Vertical Blueprint Separator Line */}
-                        <line
-                          x1="465"
-                          y1="14"
-                          x2="465"
-                          y2="492"
-                          stroke={cadFloorTheme === 'dark' ? '#1e293b' : '#cbd5e1'}
-                          strokeWidth="1.5"
-                        />
+                        {/* Vertical Blueprint Separator Line — hidden on formwork/axes plan (full-width plan mode) */}
+                        {projectionMode !== 'general' && (
+                          <line
+                            x1="465"
+                            y1="14"
+                            x2="465"
+                            y2="492"
+                            stroke={cadFloorTheme === 'dark' ? '#1e293b' : '#cbd5e1'}
+                            strokeWidth="1.5"
+                          />
+                        )}
 
-                        {/* RIGHT COL: SCHEDULING & DETAIL SECTIONS (x=471 to 701, width 230) */}
+                        {/* RIGHT COL: SCHEDULING & DETAIL SECTIONS — hidden on formwork/axes plan (general mode) */}
+                        {projectionMode !== 'general' && (
                         <g transform="translate(471, 14)">
                           {/* 1. TOP BOX: TYPICAL PROFILE DETAIL DRAWING (y=0 to y=145, height 145) */}
                           <rect
@@ -2638,6 +2641,7 @@ export default function StructuralDrawingsModule({
                           <rect x="8" y="50" width="10" height="7" fill="none" stroke="#f59e0b" strokeWidth="1" strokeDasharray="2 2" />
                           <text x="25" y="56" fontSize="6.5" fill={cadFloorTheme === 'dark' ? '#94a3b8' : '#475569'}>سقف البلاطة المسلحة</text>
                         </g>
+                        )}
                       </svg>
                     </div>
 
