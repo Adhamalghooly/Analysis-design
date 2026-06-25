@@ -1,0 +1,3 @@
+- [Structural Master — Refactor Progress](refactor-progress.md) — phases 0-2 foundation complete; stores ready; 57 tests pass.
+- [Test Infrastructure](test-infra.md) — vitest config, test locations, and exact FEM function signatures that tripped early tests.
+- [Store Architecture Decision](store-architecture.md) — Zustand stores in src/stores/ mirror AppState domains; Index.tsx not yet split.
