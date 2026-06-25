@@ -1,3 +1,3 @@
-- [Structural Master — Refactor Progress](refactor-progress.md) — phases 0-2 foundation complete; stores ready; 57 tests pass.
+- [Structural Master — Refactor Progress](refactor-progress.md) — Phase 2 JSX decomposition complete; Index.tsx 7742→3985 lines; 57 tests pass.
 - [Test Infrastructure](test-infra.md) — vitest config, test locations, and exact FEM function signatures that tripped early tests.
 - [Store Architecture Decision](store-architecture.md) — Zustand stores in src/stores/ mirror AppState domains; Index.tsx not yet split.
