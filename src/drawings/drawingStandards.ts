@@ -57,17 +57,38 @@ export const defaultTitleBlockConfig: Partial<TitleBlockConfig> = {
 };
 
 // =================== LINE WEIGHTS ===================
+// Single source of truth for all line weights across all renderers (Canvas/PDF/HTML/DXF).
+// References: ACI 315-99 "Details and Detailing of Concrete Reinforcement",
+//             ISO 128-20 "Technical Drawings — Line conventions and applications".
+// Conflict resolution documented below — values chosen to match ACI 315 practice.
 
 export const LINE_WEIGHTS = {
-  BORDER_OUTER: 1.0,
-  BORDER_INNER: 0.35,
-  STRUCTURAL_ELEMENT: 0.5,
-  DIMENSION: 0.25,
-  GRID: 0.13,
-  SECTION_CUT: 0.7,
+  // Sheet borders — ISO 128 Table 1: outer frame 0.7-1.0 mm, inner frame 0.35 mm
+  BORDER_OUTER: 1.0,    // ACI 315 §1.2: thick outer frame — was 0.8 in drawingCoreEngine → resolved to 1.0 per ISO 128
+  BORDER_INNER: 0.35,   // ISO 128: medium for inner/title-block frame
+
+  // Structural elements — ACI 315 §2.3: medium lines 0.35-0.5 mm
+  STRUCTURAL_ELEMENT: 0.5,  // Columns, walls (heaviest structural element)
+  BEAM: 0.4,                 // Beams / lintels — slightly lighter than columns
+  SLAB: 0.3,                 // Slab outlines
+  FOUNDATION: 0.5,           // Foundation elements (same weight as columns, ACI 315)
+
+  // Reinforcement — ACI 315 §2.4: rebar lines 0.5 mm
+  REBAR: 0.5,                // was 0.6 in drawingCoreEngine → resolved to 0.5 per ACI 315
+
+  // Dimensions & annotations — ISO 128: thin lines 0.18-0.25 mm
+  DIMENSION: 0.25,           // was 0.2 in drawingCoreEngine → resolved to 0.25 per ISO 128
+  TEXT_LEADER: 0.18,
+  TEXT: 0.18,                // was 0.25 in drawingCoreEngine → resolved to 0.18 per ISO 128
+
+  // Special lines
+  GRID: 0.13,               // ISO 128: auxiliary/reference lines — was 0.15 in drawingCoreEngine → 0.13
+  SECTION_CUT: 0.7,         // ISO 128: section cut lines — was 0.6 in drawingCoreEngine → 0.7 per ISO 128
   CENTERLINE: 0.18,
   HIDDEN: 0.18,
-  TEXT_LEADER: 0.18,
+
+  // Schedules and BBS tables
+  SCHEDULE: 0.25,
 } as const;
 
 // =================== DRAWING NUMBER SYSTEM ===================

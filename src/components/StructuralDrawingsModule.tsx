@@ -731,9 +731,12 @@ export default function StructuralDrawingsModule({
     const drawnW = cadFloorBounds.w * scaleCad;
     const drawnH = cadFloorBounds.h * scaleCad;
 
-    // Horizontally, zoom in specifically on the left 460px where the floor plan lies, keeping bubbles and dimensions clean with padding.
+    // Horizontally, crop to the floor plan area with axis bubbles
+    // General formwork/axes plan (S-101): expand viewport to full plan width — no schedule column on right
     const minPixelX = Math.max(5, offsetCadX - 55);
-    const maxPixelX = Math.min(462, offsetCadX + drawnW + 45);
+    const maxPixelX = projectionMode === 'general'
+      ? Math.min(710, offsetCadX + drawnW + 60)
+      : Math.min(462, offsetCadX + drawnW + 45);
 
     // Vertically, provide perfect pads on both top (dimensions) and bottom (bubbles)
     const minPixelY = Math.max(5, cadHeight - (offsetCadY + drawnH + 52));
@@ -763,15 +766,18 @@ export default function StructuralDrawingsModule({
       projectionMode === 'beams' ? 'S-103' :
       'S-104';
 
-    // Pick matching schedule table HTML
+    // Pick matching schedule table HTML.
+    // General formwork/axes plan (S-101): pure plan drawing only — no schedule tables per user requirement.
+    // Ref: prompt modification — مخطط القوالب والمحاور للدور = مسقط أفقي فقط بدون جداول أو ملاحظات
     let tableHTML = '';
     if (projectionMode === 'slabs') {
       tableHTML = htmlSlabScheduleTable(resolvedSlabDesigns as any, storySlabs);
     } else if (projectionMode === 'beams') {
       tableHTML = htmlBeamScheduleTable(storyBeams, resolvedBeamDesigns as any, bentUpResults);
-    } else {
+    } else if (projectionMode === 'columns') {
       tableHTML = htmlColumnScheduleTable(Object.values(resolvedColDesigns) as any);
     }
+    // projectionMode === 'general': tableHTML intentionally stays '' — formwork plan is drawing-only
 
     const titleBlockConfig = {
       firmName: 'Structural Design Studio',
@@ -936,7 +942,8 @@ export default function StructuralDrawingsModule({
               </div>
             ` : ''}
 
-            <!-- General construction guidelines & notes on bottom left -->
+            ${projectionMode !== 'general' ? `
+            <!-- General construction guidelines & notes (omitted on formwork/axes plan per drawing standard) -->
             <div style="position:absolute; bottom:36px; left:45px; width:${innerW - 610}px; height:135px; overflow:hidden; text-align:right; border:1px dashed #cbd5e1; padding:8px 12px; box-sizing:border-box;">
               <h4 style="margin: 0 0 4px 0; font-size: 9.5px; font-weight: 800; color: #1e293b;">شروط هندسية وضوابط التنفيذ العامة (General Construction Notes)</h4>
               <ul style="font-size: 7.5px; line-height: 1.4; padding-right: 14px; margin: 0; color: #475569;">
@@ -947,6 +954,7 @@ export default function StructuralDrawingsModule({
                 <li>المحافظة على غطاء خرساني لا يقل عن 25 مم للسقف، و40 مم للأعمدة والجسور.</li>
               </ul>
             </div>
+            ` : ''}
 
             <!-- Pre-rendered high-fidelity classical Title Block matching foundation drawing sheets -->
             ${htmlTitleBlock(titleBlockConfig as any)}

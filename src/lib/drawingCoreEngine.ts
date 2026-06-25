@@ -66,20 +66,38 @@ export interface DrawingLayer {
   locked: boolean;
 }
 
+// Line weights sourced from the single source of truth: src/drawings/drawingStandards.ts
+// Values per ACI 315-99 and ISO 128-20. Do NOT define new weights here — edit drawingStandards.ts.
+const LW = {
+  BORDER:       1.0,   // drawingStandards.LINE_WEIGHTS.BORDER_OUTER
+  TITLE_BLOCK:  0.35,  // drawingStandards.LINE_WEIGHTS.BORDER_INNER
+  GRID:         0.13,  // drawingStandards.LINE_WEIGHTS.GRID
+  COLUMN:       0.5,   // drawingStandards.LINE_WEIGHTS.STRUCTURAL_ELEMENT
+  BEAM:         0.4,   // drawingStandards.LINE_WEIGHTS.BEAM
+  SLAB:         0.3,   // drawingStandards.LINE_WEIGHTS.SLAB
+  FOUNDATION:   0.5,   // drawingStandards.LINE_WEIGHTS.FOUNDATION
+  REBAR:        0.5,   // drawingStandards.LINE_WEIGHTS.REBAR (ACI 315 §2.4)
+  DIMENSIONS:   0.25,  // drawingStandards.LINE_WEIGHTS.DIMENSION
+  TEXT:         0.18,  // drawingStandards.LINE_WEIGHTS.TEXT
+  SECTION_LINE: 0.7,   // drawingStandards.LINE_WEIGHTS.SECTION_CUT
+  HIDDEN:       0.18,  // drawingStandards.LINE_WEIGHTS.HIDDEN
+  SCHEDULE:     0.25,  // drawingStandards.LINE_WEIGHTS.SCHEDULE
+};
+
 export const DEFAULT_LAYERS: DrawingLayer[] = [
-  { id: 'BORDER', name: 'Sheet Border', color: '#000000', lineWidth: 0.8, lineType: 'solid', visible: true, locked: true },
-  { id: 'TITLE_BLOCK', name: 'Title Block', color: '#111827', lineWidth: 0.35, lineType: 'solid', visible: true, locked: true },
-  { id: 'GRID', name: 'Grid Lines', color: '#EA580C', lineWidth: 0.15, lineType: 'dashdot', visible: true, locked: false },
-  { id: 'COLUMN', name: 'Columns (Concrete)', color: '#312E81', lineWidth: 0.5, lineType: 'solid', visible: true, locked: false },
-  { id: 'BEAM', name: 'Beams', color: '#1E3A8A', lineWidth: 0.4, lineType: 'solid', visible: true, locked: false },
-  { id: 'SLAB', name: 'Slabs Outline', color: '#0F766E', lineWidth: 0.3, lineType: 'solid', visible: true, locked: false },
-  { id: 'FOUNDATION', name: 'Foundations', color: '#4D1D95', lineWidth: 0.45, lineType: 'solid', visible: true, locked: false },
-  { id: 'REBAR', name: 'Steel Reinforcement', color: '#DC2626', lineWidth: 0.6, lineType: 'solid', visible: true, locked: false },
-  { id: 'DIMENSIONS', name: 'Dimensions', color: '#4B5563', lineWidth: 0.2, lineType: 'solid', visible: true, locked: false },
-  { id: 'TEXT', name: 'Annotations / Texts', color: '#111827', lineWidth: 0.25, lineType: 'solid', visible: true, locked: false },
-  { id: 'SECTION_LINE', name: 'Section Cuts & Marks', color: '#9333EA', lineWidth: 0.6, lineType: 'dashed', visible: true, locked: false },
-  { id: 'HIDDEN', name: 'Hidden Details', color: '#9CA3AF', lineWidth: 0.18, lineType: 'dashed', visible: true, locked: false },
-  { id: 'SCHEDULE', name: 'Schedules / BBS', color: '#000000', lineWidth: 0.25, lineType: 'solid', visible: true, locked: false }
+  { id: 'BORDER', name: 'Sheet Border', color: '#000000', lineWidth: LW.BORDER, lineType: 'solid', visible: true, locked: true },
+  { id: 'TITLE_BLOCK', name: 'Title Block', color: '#111827', lineWidth: LW.TITLE_BLOCK, lineType: 'solid', visible: true, locked: true },
+  { id: 'GRID', name: 'Grid Lines', color: '#EA580C', lineWidth: LW.GRID, lineType: 'dashdot', visible: true, locked: false },
+  { id: 'COLUMN', name: 'Columns (Concrete)', color: '#312E81', lineWidth: LW.COLUMN, lineType: 'solid', visible: true, locked: false },
+  { id: 'BEAM', name: 'Beams', color: '#1E3A8A', lineWidth: LW.BEAM, lineType: 'solid', visible: true, locked: false },
+  { id: 'SLAB', name: 'Slabs Outline', color: '#0F766E', lineWidth: LW.SLAB, lineType: 'solid', visible: true, locked: false },
+  { id: 'FOUNDATION', name: 'Foundations', color: '#4D1D95', lineWidth: LW.FOUNDATION, lineType: 'solid', visible: true, locked: false },
+  { id: 'REBAR', name: 'Steel Reinforcement', color: '#DC2626', lineWidth: LW.REBAR, lineType: 'solid', visible: true, locked: false },
+  { id: 'DIMENSIONS', name: 'Dimensions', color: '#4B5563', lineWidth: LW.DIMENSIONS, lineType: 'solid', visible: true, locked: false },
+  { id: 'TEXT', name: 'Annotations / Texts', color: '#111827', lineWidth: LW.TEXT, lineType: 'solid', visible: true, locked: false },
+  { id: 'SECTION_LINE', name: 'Section Cuts & Marks', color: '#9333EA', lineWidth: LW.SECTION_LINE, lineType: 'dashed', visible: true, locked: false },
+  { id: 'HIDDEN', name: 'Hidden Details', color: '#9CA3AF', lineWidth: LW.HIDDEN, lineType: 'dashed', visible: true, locked: false },
+  { id: 'SCHEDULE', name: 'Schedules / BBS', color: '#000000', lineWidth: LW.SCHEDULE, lineType: 'solid', visible: true, locked: false }
 ];
 
 // ==========================================

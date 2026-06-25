@@ -57,7 +57,7 @@ import {
 import { downloadCSV } from '@/lib/capacitorDownload';
 import { generateFoundationDXF, downloadDXF, type FoundationDXFInput } from '@/export/dxfExporter';
 import FoundationDataModelPanel from './FoundationDataModelPanel';
-import FoundationDrawingsExportPanel from './FoundationDrawingsExportPanel';
+import FoundationDrawingsWorkspace from './FoundationDrawingsWorkspace';
 import { FoundationDatabase } from '@/structural/foundation/foundationEngine';
 import { FoundationType } from '@/structural/foundation/foundationTypes';
 
@@ -867,9 +867,9 @@ export default function FoundationDesignPanel({
         />
       )}
 
-      {/* ── TAB: DRAWINGS & EXPORT INTEGRATOR WORKSPACE ── */}
+      {/* ── TAB: DRAWINGS & EXPORT UNIFIED WORKSPACE ── */}
       {activeTab === 'drawings-export' && (
-        <FoundationDrawingsExportPanel
+        <FoundationDrawingsWorkspace
           columns={columns}
           colLoads3D={colLoads3D}
           fc={fc}

@@ -37,8 +37,24 @@ const GLOBAL_LAYERS = {
   REBAR_LAYOUT: { name: 'REBAR_LAYOUT', color: 6 },
 };
 
+/**
+ * DXF HEADER section — Phase 4 quality improvement.
+ * Adds $ACADVER (R2004 = AC1018, first version with reliable LWPOLYLINE support),
+ * $INSUNITS (4 = mm), and $MEASUREMENT (1 = metric).
+ * Without these, AutoCAD/DraftSight may open files in inch mode and misread line weights.
+ */
 function dxfHeader(): string {
-  return `0\nSECTION\n2\nHEADER\n0\nENDSEC\n`;
+  return [
+    '0', 'SECTION', '2', 'HEADER',
+    '9', '$ACADVER', '1', 'AC1018',
+    '9', '$INSUNITS', '70', '4',
+    '9', '$MEASUREMENT', '70', '1',
+    '9', '$ANGBASE', '50', '0.0',
+    '9', '$ANGDIR', '70', '0',
+    '9', '$LTSCALE', '40', '1.0',
+    '9', '$DIMSCALE', '40', '1.0',
+    '0', 'ENDSEC',
+  ].join('\n') + '\n';
 }
 
 function dxfTablesMultiStory(stories?: Story[]): string {
@@ -98,9 +114,83 @@ function dxfLine(x1: number, y1: number, x2: number, y2: number, layer: string):
   return `0\nLINE\n8\n${layer}\n10\n${x1.toFixed(4)}\n20\n${y1.toFixed(4)}\n30\n0.0\n11\n${x2.toFixed(4)}\n21\n${y2.toFixed(4)}\n31\n0.0\n`;
 }
 
+/**
+ * LWPOLYLINE — Phase 4 quality improvement.
+ * Replaces the legacy POLYLINE/VERTEX/SEQEND format (DXF R12) with the modern
+ * LWPOLYLINE entity introduced in DXF R2000 (AC1015). LWPOLYLINE is lighter,
+ * loads faster, and is correctly handled by all modern CAD tools.
+ */
 function dxfPolyline(points: { x: number; y: number }[], layer: string, closed: boolean = true): string {
-  const vertices = points.map(p => `0\nVERTEX\n8\n${layer}\n10\n${p.x.toFixed(4)}\n20\n${p.y.toFixed(4)}\n30\n0.0`).join('\n');
-  return `0\nPOLYLINE\n8\n${layer}\n66\n1\n70\n${closed ? 1 : 0}\n${vertices}\n0\nSEQEND\n8\n${layer}\n`;
+  const flags = closed ? 1 : 0;
+  const vertexLines = points.map(p => `10\n${p.x.toFixed(4)}\n20\n${p.y.toFixed(4)}`).join('\n');
+  return `0\nLWPOLYLINE\n8\n${layer}\n90\n${points.length}\n70\n${flags}\n${vertexLines}\n`;
+}
+
+/**
+ * HATCH entity — Phase 4 quality improvement.
+ * Generates a predefined-pattern hatch (ANSI31 for concrete, ANSI32 for soil/earth,
+ * or SOLID for solid fills). The boundary is defined as closed LINE edges.
+ * Pattern parameters match ACI 315-99 detailing conventions:
+ *   ANSI31: 45° hatching, spacing = 2 mm (scale 1.0)
+ *   ANSI32: Earth/soil cross-hatching, spacing = 2 mm
+ */
+export function dxfHatch(
+  points: { x: number; y: number }[],
+  layer: string,
+  pattern: 'ANSI31' | 'ANSI32' | 'SOLID' = 'ANSI31',
+  scale: number = 1.0,
+  angle: number = 0
+): string {
+  if (points.length < 3) return '';
+  const n = points.length;
+  const solidFill = pattern === 'SOLID' ? 1 : 0;
+
+  // Build closed boundary as LINE edges
+  const edgeLines: string[] = [];
+  for (let i = 0; i < n; i++) {
+    const p1 = points[i];
+    const p2 = points[(i + 1) % n];
+    edgeLines.push(`72\n1\n10\n${p1.x.toFixed(4)}\n20\n${p1.y.toFixed(4)}\n11\n${p2.x.toFixed(4)}\n21\n${p2.y.toFixed(4)}`);
+  }
+
+  // Pattern definition lines (one family for ANSI31, two for ANSI32)
+  let patDefs = '';
+  const sp = scale * 1.414; // diagonal spacing
+  if (pattern === 'SOLID') {
+    patDefs = '78\n0';
+  } else if (pattern === 'ANSI31') {
+    // 45° lines
+    patDefs = `78\n1\n53\n${(45 + angle).toFixed(4)}\n43\n0.0\n44\n0.0\n45\n${(-sp).toFixed(4)}\n46\n${sp.toFixed(4)}\n79\n0`;
+  } else {
+    // ANSI32: two families at 45° and 135°
+    patDefs = [
+      `78\n2`,
+      `53\n${(45 + angle).toFixed(4)}\n43\n0.0\n44\n0.0\n45\n${(-sp).toFixed(4)}\n46\n${sp.toFixed(4)}\n79\n0`,
+      `53\n${(135 + angle).toFixed(4)}\n43\n0.0\n44\n0.0\n45\n${sp.toFixed(4)}\n46\n${sp.toFixed(4)}\n79\n0`,
+    ].join('\n');
+  }
+
+  return [
+    '0', 'HATCH',
+    `8\n${layer}`,
+    '10\n0.0\n20\n0.0\n30\n0.0',
+    '210\n0.0\n220\n0.0\n230\n1.0',
+    `2\n${pattern}`,
+    `70\n${solidFill}`,
+    '71\n0',
+    '91\n1',
+    '92\n1',
+    `93\n${n}`,
+    edgeLines.join('\n'),
+    '97\n0',
+    '75\n1',
+    '76\n1',
+    `52\n${angle.toFixed(4)}`,
+    `41\n${scale.toFixed(4)}`,
+    '73\n0',
+    patDefs,
+    '98\n0',
+  ].join('\n') + '\n';
 }
 
 function dxfText(x: number, y: number, text: string, layer: string, height: number = 0.2): string {
