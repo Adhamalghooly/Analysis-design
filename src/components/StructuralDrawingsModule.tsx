@@ -2642,6 +2642,7 @@ export default function StructuralDrawingsModule({
                           <rect x="8" y="50" width="10" height="7" fill="none" stroke="#f59e0b" strokeWidth="1" strokeDasharray="2 2" />
                           <text x="25" y="56" fontSize="6.5" fill={cadFloorTheme === 'dark' ? '#94a3b8' : '#475569'}>سقف البلاطة المسلحة</text>
                         </g>
+                        </>
                         )}
                       </svg>
                     </div>
