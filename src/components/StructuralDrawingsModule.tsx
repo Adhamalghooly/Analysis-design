@@ -2220,6 +2220,7 @@ export default function StructuralDrawingsModule({
 
                         {/* RIGHT COL: SCHEDULING & DETAIL SECTIONS — hidden on formwork/axes plan (general mode) */}
                         {projectionMode !== 'general' && (
+                        <>
                         <g transform="translate(471, 14)">
                           {/* 1. TOP BOX: TYPICAL PROFILE DETAIL DRAWING (y=0 to y=145, height 145) */}
                           <rect
@@ -2570,7 +2571,7 @@ export default function StructuralDrawingsModule({
                           )}
                         </g>
 
-                        /* Bottom-Right Professional Title Stamp Block (مربع الخرطوشة الهندسي المعتمد) */
+                        {/* Bottom-Right Professional Title Stamp Block (مربع الخرطوشة الهندسي المعتمد) */}
                         <g transform="translate(480, 414)" className="opacity-80 text-right pointer-events-none">
                           {/* Outer Border */}
                           <rect
@@ -2613,7 +2614,7 @@ export default function StructuralDrawingsModule({
                           </text>
                         </g>
 
-                        /* Top-Left Dynamic Legend Box */
+                        {/* Top-Left Dynamic Legend Box */}
                         <g transform="translate(18, 18)" className="opacity-80 pointer-events-none">
                           <rect
                             x="0"
