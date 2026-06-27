@@ -221,7 +221,12 @@ export type AppAction =
   | { type: 'SET_ETABS_ANALYSIS_DATA'; data: AppState['etabsAnalysisData'] }
   | { type: 'SET_TITLE_BLOCK_CONFIG'; config: Partial<AppState['titleBlockConfig']> }
   | { type: 'SET_MANUAL_JOINT_OVERRIDES'; overrides: ManualJointOverride[] }
-  | { type: 'UPDATE_SLAB_VERTICES'; index: number; vertices: { x: number; y: number }[] };
+  | { type: 'UPDATE_SLAB_VERTICES'; index: number; vertices: { x: number; y: number }[] }
+  | { type: 'BULK_UPDATE_SLABS'; key: 'slabType' | 'direction'; value: string; storyId?: string }
+  | { type: 'MOVE_SLAB'; index: number; dx: number; dy: number }
+  | { type: 'MOVE_BEAM'; beamId: string; dx: number; dy: number; syncColocated?: boolean }
+  | { type: 'MOVE_COLUMN'; colId: string; dx: number; dy: number }
+  | { type: 'SET_BEAM_ENDPOINT_COORDS'; beamId: string; x1: number; y1: number; x2: number; y2: number };
 
 const defaultStoryId = 'ST1';
 
@@ -532,6 +537,94 @@ function coreReducer(state: AppState, action: AppAction): AppState {
       }
       updated[action.index] = slab;
       return { ...state, slabs: updated, manualColumnsGenerated: false, manualBeamsGenerated: false, analyzed: false };
+    }
+    case 'BULK_UPDATE_SLABS': {
+      const updated = state.slabs.map(s => {
+        if (action.storyId && s.storyId !== action.storyId) return s;
+        return { ...s, [action.key]: action.value };
+      });
+      return { ...state, slabs: updated, analyzed: false };
+    }
+    case 'MOVE_SLAB': {
+      const updated = [...state.slabs];
+      const s = { ...updated[action.index] };
+      s.x1 = (s.x1 || 0) + action.dx;
+      s.y1 = (s.y1 || 0) + action.dy;
+      s.x2 = (s.x2 || 0) + action.dx;
+      s.y2 = (s.y2 || 0) + action.dy;
+      if (s.vertices) s.vertices = s.vertices.map(v => ({ x: v.x + action.dx, y: v.y + action.dy }));
+      updated[action.index] = s;
+      return { ...state, slabs: updated, manualColumnsGenerated: false, manualBeamsGenerated: false, analyzed: false };
+    }
+    case 'MOVE_BEAM': {
+      const EPS = 0.005;
+      const srcBeam = [...(state.extraBeams || []), ...([] as any[])].find((b: any) => b.id === action.beamId);
+      // For extra beams, update directly
+      if (srcBeam) {
+        const updatedExtra = (state.extraBeams || []).map(b => {
+          const match = action.syncColocated
+            ? (Math.abs(b.x1 - srcBeam.x1) < EPS && Math.abs(b.y1 - srcBeam.y1) < EPS &&
+               Math.abs(b.x2 - srcBeam.x2) < EPS && Math.abs(b.y2 - srcBeam.y2) < EPS)
+            : b.id === action.beamId;
+          if (!match) return b;
+          return { ...b, x1: b.x1 + action.dx, y1: b.y1 + action.dy, x2: b.x2 + action.dx, y2: b.y2 + action.dy };
+        });
+        return { ...state, extraBeams: updatedExtra, analyzed: false };
+      }
+      // For generated beams, use overrides
+      // Collect IDs to move
+      const overridesSrc = state.beamOverrides[action.beamId] || {};
+      const newOverrides = { ...state.beamOverrides };
+      // Find all beam IDs that share same coords if sync requested
+      if (action.syncColocated) {
+        const srcOvr = overridesSrc;
+        for (const [bid, ovr] of Object.entries(newOverrides)) {
+          if (!ovr) continue;
+          const sameCoords =
+            (Math.abs((ovr.x1 ?? 0) - (srcOvr.x1 ?? 0)) < EPS && Math.abs((ovr.y1 ?? 0) - (srcOvr.y1 ?? 0)) < EPS &&
+             Math.abs((ovr.x2 ?? 0) - (srcOvr.x2 ?? 0)) < EPS && Math.abs((ovr.y2 ?? 0) - (srcOvr.y2 ?? 0)) < EPS);
+          if (sameCoords) {
+            newOverrides[bid] = { ...ovr, x1: (ovr.x1 ?? 0) + action.dx, y1: (ovr.y1 ?? 0) + action.dy, x2: (ovr.x2 ?? 0) + action.dx, y2: (ovr.y2 ?? 0) + action.dy };
+          }
+        }
+      }
+      newOverrides[action.beamId] = {
+        ...overridesSrc,
+        x1: (overridesSrc.x1 ?? 0) + action.dx,
+        y1: (overridesSrc.y1 ?? 0) + action.dy,
+        x2: (overridesSrc.x2 ?? 0) + action.dx,
+        y2: (overridesSrc.y2 ?? 0) + action.dy,
+      };
+      return { ...state, beamOverrides: newOverrides, analyzed: false };
+    }
+    case 'MOVE_COLUMN': {
+      const colOvr = state.colOverrides[action.colId] || {};
+      const col = ([] as any[]).concat(state.extraColumns || []).find((c: any) => c.id === action.colId);
+      if (col) {
+        const updatedExtra = (state.extraColumns || []).map(c =>
+          c.id === action.colId ? { ...c, x: c.x + action.dx, y: c.y + action.dy } : c
+        );
+        return { ...state, extraColumns: updatedExtra, analyzed: false };
+      }
+      return {
+        ...state,
+        colOverrides: {
+          ...state.colOverrides,
+          [action.colId]: { ...colOvr, x: (colOvr.x ?? 0) + action.dx, y: (colOvr.y ?? 0) + action.dy },
+        },
+        analyzed: false,
+      };
+    }
+    case 'SET_BEAM_ENDPOINT_COORDS': {
+      const existing = state.beamOverrides[action.beamId] || {};
+      return {
+        ...state,
+        beamOverrides: {
+          ...state.beamOverrides,
+          [action.beamId]: { ...existing, x1: action.x1, y1: action.y1, x2: action.x2, y2: action.y2 },
+        },
+        analyzed: false,
+      };
     }
     case 'SET_MAT':
       return { ...state, mat: { ...state.mat, ...action.mat }, analyzed: false };

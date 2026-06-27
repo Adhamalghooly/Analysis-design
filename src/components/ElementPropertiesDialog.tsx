@@ -47,6 +47,13 @@ interface ElementPropertiesDialogProps {
     nodeJRestraints?: EndRelease;
     restraints?: EndRelease;
     applyToUpperFloors?: boolean;
+    moveX?: number;
+    moveY?: number;
+    syncColocated?: boolean;
+    newX1?: number;
+    newY1?: number;
+    newX2?: number;
+    newY2?: number;
   }) => void;
   onDelete?: (data: { frameId?: number; areaId?: number; nodeId?: number }) => void;
 }
@@ -66,14 +73,32 @@ export default function ElementPropertiesDialog({
   const [nodeRestraints, setNodeRestraints] = useState<EndRelease>({ ux: false, uy: false, uz: false, rx: false, ry: false, rz: false });
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [applyToUpperFloors, setApplyToUpperFloors] = useState(false);
+  // Move state
+  const [moveX, setMoveX] = useState('0');
+  const [moveY, setMoveY] = useState('0');
+  const [syncColocated, setSyncColocated] = useState(false);
+  // Beam coordinate edit state
+  const [editX1, setEditX1] = useState('0');
+  const [editY1, setEditY1] = useState('0');
+  const [editX2, setEditX2] = useState('0');
+  const [editY2, setEditY2] = useState('0');
 
   useEffect(() => {
     setConfirmDelete(false);
     setApplyToUpperFloors(false);
+    setMoveX('0');
+    setMoveY('0');
+    setSyncColocated(false);
     if (frame) {
       setB(frame.b || 200);
       setH(frame.h || 400);
       setOrientAngle(columnOrientAngle ?? 0);
+    }
+    if (frame?.type === 'beam' && nodeI && nodeJ) {
+      setEditX1(nodeI.x.toFixed(3));
+      setEditY1(nodeI.y.toFixed(3));
+      setEditX2(nodeJ.x.toFixed(3));
+      setEditY2(nodeJ.y.toFixed(3));
     }
     if (area) {
       setThickness(area.thickness);
@@ -92,22 +117,46 @@ export default function ElementPropertiesDialog({
   }, [frame, area, node, nodeI, nodeJ, slabProps, columnOrientAngle]);
 
   const handleSave = () => {
+    const dx = parseFloat(moveX) || 0;
+    const dy = parseFloat(moveY) || 0;
     if (node) {
       onSave({
         nodeId: node.id,
         restraints: nodeRestraints,
       });
     } else if (frame) {
-      onSave({
+      const saveData: Parameters<typeof onSave>[0] = {
         frameId: frame.id,
         b, h,
         orientAngle: isColumn ? orientAngle : undefined,
         nodeIRestraints: releaseI,
         nodeJRestraints: releaseJ,
         applyToUpperFloors: isColumn ? applyToUpperFloors : undefined,
-      });
+        moveX: dx !== 0 ? dx : undefined,
+        moveY: dy !== 0 ? dy : undefined,
+        syncColocated: isBeam ? syncColocated : undefined,
+      };
+      if (isBeam) {
+        const x1 = parseFloat(editX1);
+        const y1 = parseFloat(editY1);
+        const x2 = parseFloat(editX2);
+        const y2 = parseFloat(editY2);
+        const coordsChanged = nodeI && nodeJ && (
+          Math.abs(x1 - nodeI.x) > 0.0001 || Math.abs(y1 - nodeI.y) > 0.0001 ||
+          Math.abs(x2 - nodeJ.x) > 0.0001 || Math.abs(y2 - nodeJ.y) > 0.0001
+        );
+        if (coordsChanged) {
+          saveData.newX1 = x1; saveData.newY1 = y1;
+          saveData.newX2 = x2; saveData.newY2 = y2;
+        }
+      }
+      onSave(saveData);
     } else if (area) {
-      onSave({ areaId: area.id, thickness, finishLoad, liveLoad, cover });
+      onSave({
+        areaId: area.id, thickness, finishLoad, liveLoad, cover,
+        moveX: dx !== 0 ? dx : undefined,
+        moveY: dy !== 0 ? dy : undefined,
+      });
     }
     onClose();
   };
@@ -352,6 +401,90 @@ export default function ElementPropertiesDialog({
                   <span className="text-muted-foreground">الحمل النهائي (1.2D + 1.6L)</span>
                   <span className="font-mono">{(1.2 * (thickness / 1000 * 25 + finishLoad) + 1.6 * liveLoad).toFixed(2)} kN/m²</span>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Move Element Section */}
+          {(isBeam || isColumn || isArea) && (
+            <div className="space-y-3 border border-orange-200 dark:border-orange-800 rounded-lg p-3 bg-orange-50/40 dark:bg-orange-950/20">
+              <h4 className="text-sm font-semibold text-orange-700 dark:text-orange-400 flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg>
+                تحريك العنصر (إزاحة نسبية)
+              </h4>
+              <p className="text-[10px] text-muted-foreground">أدخل قيمة الإزاحة بالمتر — موجب لليمين/للأعلى، سالب لليسار/للأسفل</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground flex items-center gap-1">
+                    <span className="font-mono font-bold text-blue-600">ΔX</span>
+                    <span className="text-[9px]">(+ يمين / - يسار)</span>
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={moveX}
+                    onChange={e => setMoveX(e.target.value)}
+                    className="h-10 font-mono text-sm"
+                    placeholder="0.00 م"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground flex items-center gap-1">
+                    <span className="font-mono font-bold text-green-600">ΔY</span>
+                    <span className="text-[9px]">(+ فوق / - تحت)</span>
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={moveY}
+                    onChange={e => setMoveY(e.target.value)}
+                    className="h-10 font-mono text-sm"
+                    placeholder="0.00 م"
+                  />
+                </div>
+              </div>
+              {isBeam && (
+                <div className="flex items-center gap-2 rounded-lg border border-border bg-background/60 px-3 py-2">
+                  <Checkbox
+                    id="sync-colocated"
+                    checked={syncColocated}
+                    onCheckedChange={v => setSyncColocated(!!v)}
+                  />
+                  <label htmlFor="sync-colocated" className="text-xs cursor-pointer leading-tight">
+                    تحريك جميع الجسور المطابقة في الإحداثيات (جميع الأدوار)
+                  </label>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Beam Coordinate Edit Section */}
+          {isBeam && nodeI && nodeJ && (
+            <div className="space-y-3 border border-blue-200 dark:border-blue-800 rounded-lg p-3 bg-blue-50/30 dark:bg-blue-950/20">
+              <h4 className="text-sm font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3h18v18H3z"/><path d="M3 9h18M9 3v18"/></svg>
+                تعديل إحداثيات الجسر مباشرة (م)
+              </h4>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-muted-foreground font-mono">X₁ (بداية)</label>
+                  <Input type="number" step="0.01" value={editX1} onChange={e => setEditX1(e.target.value)} className="h-9 font-mono text-xs" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] text-muted-foreground font-mono">Y₁ (بداية)</label>
+                  <Input type="number" step="0.01" value={editY1} onChange={e => setEditY1(e.target.value)} className="h-9 font-mono text-xs" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] text-muted-foreground font-mono">X₂ (نهاية)</label>
+                  <Input type="number" step="0.01" value={editX2} onChange={e => setEditX2(e.target.value)} className="h-9 font-mono text-xs" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] text-muted-foreground font-mono">Y₂ (نهاية)</label>
+                  <Input type="number" step="0.01" value={editY2} onChange={e => setEditY2(e.target.value)} className="h-9 font-mono text-xs" />
+                </div>
+              </div>
+              <div className="text-[9px] text-muted-foreground bg-muted/40 rounded p-2">
+                الطول المحسوب: {(Math.sqrt((parseFloat(editX2) - parseFloat(editX1)) ** 2 + (parseFloat(editY2) - parseFloat(editY1)) ** 2) || 0).toFixed(3)} م
               </div>
             </div>
           )}

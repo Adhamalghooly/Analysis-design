@@ -116,7 +116,7 @@ const SlabsInputPanel: React.FC<SlabsInputPanelProps> = ({
                   
                   {/* Slabs table */}
                   <Card>
-                    <CardHeader className="pb-2 flex-row items-center justify-between">
+                    <CardHeader className="pb-2 flex-row items-center justify-between flex-wrap gap-2">
                       <div>
                         <CardTitle className="text-sm">إحداثيات البلاطات (م) - {isAllStories ? 'جميع الأدوار' : getStoryLabel(selectedStoryId)}</CardTitle>
                         <p className="text-[10px] text-muted-foreground mt-0.5">
@@ -125,6 +125,67 @@ const SlabsInputPanel: React.FC<SlabsInputPanelProps> = ({
                       </div>
                       <Button onClick={() => dispatch({ type: 'ADD_SLAB', slab: { id: `S${slabs.length + 1}`, x1: 0, y1: 0, x2: 5, y2: 4, storyId: selectedStoryId === '__ALL__' ? stories[0]?.id : selectedStoryId } })} size="sm" variant="outline" className="min-h-[44px] gap-1"><Plus size={14} /> إضافة بلاطة</Button>
                     </CardHeader>
+                    {/* Bulk Type/Direction Controls */}
+                    <div className="px-4 pb-3 flex flex-wrap gap-2 items-center border-b border-border">
+                      <span className="text-xs font-medium text-muted-foreground shrink-0">تغيير جماعي:</span>
+                      <div className="flex items-center gap-1.5">
+                        <select
+                          id="bulk-slab-type"
+                          defaultValue=""
+                          className="h-9 text-xs border border-input rounded-md px-2 bg-background text-foreground"
+                        >
+                          <option value="" disabled>نوع البلاطة...</option>
+                          <option value="solid">مصمتة Solid</option>
+                          <option value="one_way_ribbed">هوردي Ribbed</option>
+                        </select>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-9 text-xs gap-1 border-violet-400 text-violet-700 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950"
+                          onClick={() => {
+                            const sel = (document.getElementById('bulk-slab-type') as HTMLSelectElement)?.value;
+                            if (!sel) return;
+                            dispatch({
+                              type: 'BULK_UPDATE_SLABS',
+                              key: 'slabType',
+                              value: sel,
+                              storyId: isAllStories ? undefined : selectedStoryId,
+                            });
+                          }}
+                        >
+                          <CheckSquare size={12} /> تطبيق النوع
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <select
+                          id="bulk-slab-dir"
+                          defaultValue=""
+                          className="h-9 text-xs border border-input rounded-md px-2 bg-background text-foreground"
+                        >
+                          <option value="" disabled>اتجاه الفرش...</option>
+                          <option value="auto">تلقائي Auto</option>
+                          <option value="X">اتجاه X</option>
+                          <option value="Y">اتجاه Y</option>
+                        </select>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-9 text-xs gap-1 border-blue-400 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950"
+                          onClick={() => {
+                            const sel = (document.getElementById('bulk-slab-dir') as HTMLSelectElement)?.value;
+                            if (!sel) return;
+                            dispatch({
+                              type: 'BULK_UPDATE_SLABS',
+                              key: 'direction',
+                              value: sel,
+                              storyId: isAllStories ? undefined : selectedStoryId,
+                            });
+                          }}
+                        >
+                          <Crosshair size={12} /> تطبيق الاتجاه
+                        </Button>
+                      </div>
+                    </div>
                     <CardContent className="overflow-x-auto">
                       <Table>
                         <TableHeader>
@@ -1664,7 +1725,7 @@ const SlabsInputPanel: React.FC<SlabsInputPanelProps> = ({
               {/* ── بلاطات tab ── */}
               <TabsContent value="slabs-slabs-tab" className="flex-1 overflow-y-auto p-3 md:p-4 mt-0 pb-20 md:pb-4">
                 <div className="space-y-3 max-w-5xl">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center flex-wrap gap-2">
                     <Input
                       placeholder="بحث في البلاطات (رقم البلاطة، الدور...)"
                       value={slabSearch}
@@ -1677,6 +1738,26 @@ const SlabsInputPanel: React.FC<SlabsInputPanelProps> = ({
                     <span className="text-[11px] text-muted-foreground">
                       {slabs.filter(s => !slabSearch || s.id.toLowerCase().includes(slabSearch.toLowerCase()) || getStoryLabel(s.storyId).includes(slabSearch)).length} بلاطة
                     </span>
+                    <span className="text-[11px] text-muted-foreground font-medium mr-2">| تغيير جماعي:</span>
+                    <select id="bulk-slab-type2" defaultValue="" className="h-8 text-[11px] border border-input rounded px-1 bg-background text-foreground">
+                      <option value="" disabled>النوع...</option>
+                      <option value="solid">مصمتة Solid</option>
+                      <option value="one_way_ribbed">هوردي Ribbed</option>
+                    </select>
+                    <Button size="sm" variant="outline" className="h-8 text-[11px] gap-1 border-violet-400 text-violet-700 dark:text-violet-400" onClick={() => {
+                      const sel = (document.getElementById('bulk-slab-type2') as HTMLSelectElement)?.value;
+                      if (sel) dispatch({ type: 'BULK_UPDATE_SLABS', key: 'slabType', value: sel });
+                    }}><CheckSquare size={11} /> نوع</Button>
+                    <select id="bulk-slab-dir2" defaultValue="" className="h-8 text-[11px] border border-input rounded px-1 bg-background text-foreground">
+                      <option value="" disabled>الاتجاه...</option>
+                      <option value="auto">تلقائي</option>
+                      <option value="X">X</option>
+                      <option value="Y">Y</option>
+                    </select>
+                    <Button size="sm" variant="outline" className="h-8 text-[11px] gap-1 border-blue-400 text-blue-700 dark:text-blue-400" onClick={() => {
+                      const sel = (document.getElementById('bulk-slab-dir2') as HTMLSelectElement)?.value;
+                      if (sel) dispatch({ type: 'BULK_UPDATE_SLABS', key: 'direction', value: sel });
+                    }}><Crosshair size={11} /> اتجاه</Button>
                   </div>
                   <Card>
                     <CardContent className="overflow-x-auto pt-3">

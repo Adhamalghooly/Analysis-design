@@ -1989,7 +1989,7 @@ const Index = () => {
       if (frame) {
         const EPS = 0.01;
         // Persist beam dimensions to React state so they survive model rebuilds
-        if (frame.type === 'beam' && data.b != null && data.h != null) {
+        if (frame.type === 'beam') {
           const nodeI = modelManager.getNode(frame.nodeI);
           const nodeJ = modelManager.getNode(frame.nodeJ);
           if (nodeI && nodeJ) {
@@ -2009,12 +2009,38 @@ const Index = () => {
                  Math.abs(b.x2 - nodeI.x) < EPS && Math.abs(b.y2 - nodeI.y) < EPS)
               );
             if (matchingBeam) {
-              dispatch({ type: 'SET_BEAM_OVERRIDE', beamId: matchingBeam.id, override: { b: Number(data.b), h: Number(data.h) } });
+              if (data.b != null && data.h != null) {
+                dispatch({ type: 'SET_BEAM_OVERRIDE', beamId: matchingBeam.id, override: { b: Number(data.b), h: Number(data.h) } });
+              }
+              // Handle move by delta
+              if (data.moveX != null || data.moveY != null) {
+                const dx = data.moveX ?? 0;
+                const dy = data.moveY ?? 0;
+                if (data.syncColocated) {
+                  // Move all beams with the same X,Y coordinates
+                  const srcX1 = nodeI.x, srcY1 = nodeI.y, srcX2 = nodeJ.x, srcY2 = nodeJ.y;
+                  const beamsToMove = beams.filter(b =>
+                    (Math.abs(b.x1 - srcX1) < EPS && Math.abs(b.y1 - srcY1) < EPS &&
+                     Math.abs(b.x2 - srcX2) < EPS && Math.abs(b.y2 - srcY2) < EPS) ||
+                    (Math.abs(b.x1 - srcX2) < EPS && Math.abs(b.y1 - srcY2) < EPS &&
+                     Math.abs(b.x2 - srcX1) < EPS && Math.abs(b.y2 - srcY1) < EPS)
+                  );
+                  for (const bm of beamsToMove) {
+                    dispatch({ type: 'SET_BEAM_OVERRIDE', beamId: bm.id, override: { x1: bm.x1 + dx, y1: bm.y1 + dy, x2: bm.x2 + dx, y2: bm.y2 + dy } });
+                  }
+                } else {
+                  dispatch({ type: 'SET_BEAM_OVERRIDE', beamId: matchingBeam.id, override: { x1: matchingBeam.x1 + dx, y1: matchingBeam.y1 + dy, x2: matchingBeam.x2 + dx, y2: matchingBeam.y2 + dy } });
+                }
+              }
+              // Handle direct coordinate edit
+              if (data.newX1 != null) {
+                dispatch({ type: 'SET_BEAM_OVERRIDE', beamId: matchingBeam.id, override: { x1: data.newX1, y1: data.newY1, x2: data.newX2, y2: data.newY2 } });
+              }
             }
           }
         }
         // Persist column dimensions to React state so they survive model rebuilds
-        if (frame.type === 'column' && (data.b != null || data.orientAngle != null)) {
+        if (frame.type === 'column' && (data.b != null || data.orientAngle != null || data.moveX != null || data.moveY != null)) {
           // Use the top node (nodeJ) x,y to locate the column in the React state
           const topNode = modelManager.getNode(frame.nodeJ);
           if (topNode) {
@@ -2033,6 +2059,11 @@ const Index = () => {
               if (data.b != null) override.b = Number(data.b);
               if (data.h != null) override.h = Number(data.h);
               if (data.orientAngle != null) override.orientAngle = Number(data.orientAngle);
+              // Handle move by delta
+              if (data.moveX != null || data.moveY != null) {
+                override.x = col.x + (data.moveX ?? 0);
+                override.y = col.y + (data.moveY ?? 0);
+              }
               dispatch({ type: 'SET_COL_OVERRIDE', colId: col.id, override });
             }
           }
@@ -2073,10 +2104,21 @@ const Index = () => {
       if (Object.keys(override).length > 0) {
         dispatch({ type: 'SET_SLAB_PROPS_OVERRIDE', areaId: data.areaId, override });
       }
+      // Handle slab move by delta — find matching slab in state.slabs via area label
+      if ((data.moveX != null || data.moveY != null) && (data.moveX !== 0 || data.moveY !== 0)) {
+        const area = currentAreas.find(a => a.id === data.areaId);
+        if (area) {
+          const slabIdx = slabs.findIndex(s => s.id === area.label || `A${area.id}` === `A${data.areaId}`);
+          if (slabIdx !== -1) {
+            dispatch({ type: 'MOVE_SLAB', index: slabIdx, dx: data.moveX ?? 0, dy: data.moveY ?? 0 });
+          }
+        }
+      }
     }
     dispatch({ type: 'INC_MODEL_VERSION' });
     dispatch({ type: 'RESET_ANALYSIS' });
-  }, [beams, columns, selectedStoryId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [beams, columns, selectedStoryId, slabs]);
 
   const handleLevelElementDelete = useCallback((type: 'beam' | 'column' | 'slab', id: string) => {
     if (type === 'beam') {
