@@ -514,7 +514,8 @@ function coreReducer(state: AppState, action: AppAction): AppState {
       return { ...state, slabs: state.slabs.filter((_, i) => i !== action.index), manualColumnsGenerated: false, manualBeamsGenerated: false, analyzed: false };
     case 'UPDATE_SLAB': {
       const updated = [...state.slabs];
-      (updated[action.index] as any)[action.key] = (action.key === 'id' || action.key === 'storyId') ? action.value : parseFloat(action.value) || 0;
+      const stringKeys = ['id', 'storyId', 'slabType', 'direction'];
+      (updated[action.index] as any)[action.key] = stringKeys.includes(action.key) ? action.value : parseFloat(action.value) || 0;
       return { ...state, slabs: updated, manualColumnsGenerated: false, manualBeamsGenerated: false, analyzed: false };
     }
     case 'UPDATE_SLAB_VERTICES': {

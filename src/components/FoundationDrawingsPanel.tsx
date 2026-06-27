@@ -425,59 +425,99 @@ export default function FoundationDrawingsPanel({
     const sheetTitle = sheetLabels[sheetId] || 'مخطط إنشائي';
 
     switch (sheetId) {
-      case 'S-101':
-        // Generate SVG content
+      case 'S-101': {
+        // Larger SVG plan for better visibility
+        const svgW = 750;
+        const svgH_plan = 520;
+        const svgPad = 50;
+        const scaleP = Math.min((svgW - 2 * svgPad) / projectBounds.width, (svgH_plan - 2 * svgPad) / projectBounds.height);
+        const mX = (v: number) => svgPad + (v - projectBounds.minX) * scaleP;
+        const mY = (v: number) => svgH_plan - (svgPad + (v - projectBounds.minY) * scaleP);
+
+        // Build reinforcement schedule rows HTML
+        const rebarRowsHTML = projectData.types.map((t, idx) => `
+          <tr style="background:${idx % 2 === 0 ? '#f8fafc' : '#ffffff'};">
+            <td style="border:1px solid #cbd5e1;padding:4px 6px;font-weight:bold;color:#1e293b;text-align:center;">${t.typeMark}</td>
+            <td style="border:1px solid #cbd5e1;padding:4px 6px;text-align:center;font-family:monospace;">${t.B}×${t.L}</td>
+            <td style="border:1px solid #cbd5e1;padding:4px 6px;text-align:center;font-family:monospace;">${t.H}</td>
+            <td style="border:1px solid #cbd5e1;padding:4px 6px;text-align:center;color:#1e3a8a;font-weight:bold;">${t.rebarX.quantity}Ø${t.rebarX.diameter}</td>
+            <td style="border:1px solid #cbd5e1;padding:4px 6px;text-align:center;color:#7c2d12;font-weight:bold;">${t.rebarY.quantity}Ø${t.rebarY.diameter}</td>
+            <td style="border:1px solid #cbd5e1;padding:4px 6px;text-align:center;font-family:monospace;">${t.footingCount}</td>
+          </tr>
+        `).join('');
+
         sheetContent = `
-          <div style="width:100%; height:100%; display:flex; justify-content:center; align-items:center; background:#ffffff; padding:15px; box-sizing:border-box;">
-            <div style="text-align:center;">
-              <h3 style="margin:5px 0; font-size:14px; font-weight:bold; color:#1e293b;">مخطط أساسات مشروع: ${projectName}</h3>
-              <p style="margin:2px 0 15px 0; font-size:10px; color:#64748b;">مسقط عام يوضح توزيع القواعد بالتقاطع مع المحاور والمحليّات الجغرافية</p>
-              <div style="border:1.5px solid #cbd5e1; border-radius:8px; overflow:hidden; background:#f8fafc; padding:20px; max-width:600px; margin:0 auto;">
-                <svg viewBox="0 0 600 450" width="100%" height="auto" style="display:block; margin:0 auto; background:#ffffff;">
+          <div style="width:100%;background:#ffffff;padding:12px;box-sizing:border-box;direction:rtl;">
+            <h3 style="margin:4px 0 10px 0;font-size:13px;font-weight:bold;color:#1e293b;text-align:center;">مخطط أساسات مشروع: ${projectName}</h3>
+            <div style="display:flex;gap:12px;align-items:flex-start;">
+              <!-- Plan SVG -->
+              <div style="flex:1;border:1.5px solid #cbd5e1;border-radius:6px;overflow:hidden;background:#f8fafc;">
+                <svg viewBox="0 0 ${svgW} ${svgH_plan}" width="100%" height="auto" style="display:block;background:#ffffff;">
                   <g stroke="#cbd5e1" stroke-width="0.8" stroke-dasharray="4 4">
-                    ${projectData.xGridLines.map(gl => `<line x1="${mapX(gl.coord)}" y1="25" x2="${mapX(gl.coord)}" y2="${planSvgHeight - 30}" />`).join('')}
-                    ${projectData.yGridLines.map(gl => `<line x1="25" y1="${mapY(gl.coord)}" x2="${planSvgWidth - 25}" y2="${mapY(gl.coord)}" />`).join('')}
+                    ${projectData.xGridLines.map(gl => `<line x1="${mX(gl.coord)}" y1="${svgPad - 15}" x2="${mX(gl.coord)}" y2="${svgH_plan - svgPad + 15}" />`).join('')}
+                    ${projectData.yGridLines.map(gl => `<line x1="${svgPad - 15}" y1="${mY(gl.coord)}" x2="${svgW - svgPad + 15}" y2="${mY(gl.coord)}" />`).join('')}
                   </g>
-                  <g font-size="9" font-family="Cairo, sans-serif" font-weight="bold" fill="#334155">
+                  <g font-size="9" font-family="Cairo,sans-serif" font-weight="bold" fill="#334155">
                     ${projectData.xGridLines.map(gl => `
-                      <circle cx="${mapX(gl.coord)}" cy="15" r="8" fill="#f8fafc" stroke="#64748b" stroke-width="1" />
-                      <text x="${mapX(gl.coord)}" y="18" text-anchor="middle" font-size="8">${gl.label}</text>
+                      <circle cx="${mX(gl.coord)}" cy="${svgPad - 22}" r="9" fill="#f8fafc" stroke="#64748b" stroke-width="1"/>
+                      <text x="${mX(gl.coord)}" y="${svgPad - 18}" text-anchor="middle" font-size="8">${gl.label}</text>
                     `).join('')}
                     ${projectData.yGridLines.map(gl => `
-                      <circle cx="15" cy="${mapY(gl.coord)}" r="8" fill="#f8fafc" stroke="#64748b" stroke-width="1" />
-                      <text x="15" y="${mapY(gl.coord) + 3}" text-anchor="middle" font-size="8">${gl.label}</text>
+                      <circle cx="${svgPad - 22}" cy="${mY(gl.coord)}" r="9" fill="#f8fafc" stroke="#64748b" stroke-width="1"/>
+                      <text x="${svgPad - 22}" y="${mY(gl.coord) + 3}" text-anchor="middle" font-size="8">${gl.label}</text>
                     `).join('')}
                   </g>
                   ${projectData.locations.map(loc => {
                     const type = projectData.types.find(t => t.typeMark === loc.typeMark)!;
-                    const w_m = type.B / 1000;
-                    const l_m = type.L / 1000;
-                    const footW = w_m * scaleProj;
-                    const footH = l_m * scaleProj;
-                    const fX = mapX(loc.x) - footW / 2;
-                    const fY = mapY(loc.y) - footH / 2;
-
-                    const colW = (loc.colB / 1000) * scaleProj;
-                    const colH = (loc.colH / 1000) * scaleProj;
-                    const cX = mapX(loc.x) - colW / 2;
-                    const cY = mapY(loc.y) - colH / 2;
-
+                    if (!type) return '';
+                    const footW = (type.B / 1000) * scaleP;
+                    const footH = (type.L / 1000) * scaleP;
+                    const fX = mX(loc.x) - footW / 2;
+                    const fY = mY(loc.y) - footH / 2;
+                    const colW = (loc.colB / 1000) * scaleP;
+                    const colH = (loc.colH / 1000) * scaleP;
+                    const cX = mX(loc.x) - colW / 2;
+                    const cY = mY(loc.y) - colH / 2;
+                    const isOverlap = overlappingColumnIds.has(loc.colId);
+                    // Label inside footing in red
+                    const labelFontSize = Math.max(6, Math.min(10, footW / (loc.typeMark.length + 1)));
                     return `
                       <g>
-                        <rect x="${fX}" y="${fY}" width="${footW}" height="${footH}" fill="rgba(30,41,59,0.05)" stroke="#475569" stroke-width="1.2" rx="2" />
-                        <rect x="${cX}" y="${cY}" width="${colW}" height="${colH}" fill="#e11d48" stroke="#be123c" stroke-width="0.8" />
-                        <rect x="${mapX(loc.x) - 12}" y="${fY - 12}" width="24" height="10" fill="#0f172a" rx="2" />
-                        <text x="${mapX(loc.x)}" y="${fY - 4}" fill="#06b6d4" text-anchor="middle" font-size="7" font-weight="bold">${loc.typeMark}</text>
-                        <text x="${mapX(loc.x)}" y="${mapY(loc.y) + (colH/2) + 11}" fill="#64748b" text-anchor="middle" font-size="6.5" font-family="monospace">${loc.colId}</text>
+                        <rect x="${fX}" y="${fY}" width="${footW}" height="${footH}" fill="${isOverlap ? 'rgba(239,68,68,0.08)' : 'rgba(30,41,59,0.04)'}" stroke="${isOverlap ? '#ef4444' : '#475569'}" stroke-width="${isOverlap ? 1.8 : 1.2}" rx="1"/>
+                        <rect x="${cX}" y="${cY}" width="${colW}" height="${colH}" fill="#1e293b" stroke="#0f172a" stroke-width="0.8"/>
+                        <text x="${mX(loc.x)}" y="${fY + footH / 2 + labelFontSize * 0.4}" fill="#dc2626" text-anchor="middle" font-size="${labelFontSize}" font-weight="bold" font-family="Cairo,sans-serif">${loc.typeMark}</text>
                       </g>
                     `;
                   }).join('')}
                 </svg>
               </div>
+              <!-- Reinforcement Schedule Table on the right -->
+              <div style="min-width:260px;max-width:280px;">
+                <table style="width:100%;border-collapse:collapse;font-size:10px;font-family:Cairo,sans-serif;direction:rtl;">
+                  <thead>
+                    <tr style="background:#0f172a;color:#ffffff;">
+                      <th style="border:1px solid #475569;padding:5px;text-align:center;">رمز</th>
+                      <th style="border:1px solid #475569;padding:5px;text-align:center;">B×L (mm)</th>
+                      <th style="border:1px solid #475569;padding:5px;text-align:center;">H (mm)</th>
+                      <th style="border:1px solid #475569;padding:5px;text-align:center;">تسليح X</th>
+                      <th style="border:1px solid #475569;padding:5px;text-align:center;">تسليح Y</th>
+                      <th style="border:1px solid #475569;padding:5px;text-align:center;">عدد</th>
+                    </tr>
+                  </thead>
+                  <tbody>${rebarRowsHTML}</tbody>
+                </table>
+                <div style="margin-top:8px;padding:6px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:4px;font-size:9px;color:#475569;">
+                  <div style="font-weight:bold;margin-bottom:3px;">مفتاح الرموز:</div>
+                  <div>■ أسود = عمود</div>
+                  <div>□ رمادي = قاعدة</div>
+                  <div style="color:#dc2626;">F1,F2... = نوع القاعدة</div>
+                </div>
+              </div>
             </div>
           </div>
         `;
         break;
+      }
       case 'S-201':
         sheetContent = `
           <div style="padding: 20px; font-family:'Cairo', 'Segoe UI', sans-serif; direction:rtl; text-align:right;">

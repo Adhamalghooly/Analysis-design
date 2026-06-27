@@ -185,8 +185,11 @@ export default function StrapFootingAnalysisPanel({
   const handleAddNewStrap = () => {
     if (!onFoundationDbChange || !foundationDb) return;
     
-    // Generate unique index/id
-    const nextIndex = strapFootingsInDb.length + 1;
+    // Generate unique index/id - use max existing index + 1 to avoid duplicates
+    const existingIndices = foundationDb.foundations
+      .filter(f => f.type === FoundationType.Strap)
+      .map(f => parseInt(f.id.replace('STRAP-', '')) || 0);
+    const nextIndex = existingIndices.length > 0 ? Math.max(...existingIndices) + 1 : 1;
     const nextId = `STRAP-${nextIndex}`;
     const nextName = `ميدة ربط STRAP-${nextIndex}`;
     
@@ -235,11 +238,6 @@ export default function StrapFootingAnalysisPanel({
   // Delete current strap footing
   const handleDeleteStrap = () => {
     if (!onFoundationDbChange || !foundationDb) return;
-    if (strapFootingsInDb.length <= 1) {
-      alert("يجب الإبقاء على ميدة ربط واحدة على الأقل في المشروع.");
-      return;
-    }
-    
     if (!confirm("هل أنت متأكد من رغبتك في حذف ميدة الربط هذه بشكل نهائي؟")) return;
     
     const remaining = foundationDb.foundations.filter(f => f.id !== selectedFootingId);
@@ -415,6 +413,54 @@ export default function StrapFootingAnalysisPanel({
   return (
     <div id="strap-footing-module" className="grid grid-cols-1 lg:grid-cols-12 gap-6" dir="rtl">
       
+      {/* Strap Footing Selector & Add/Delete Controls */}
+      <div className="lg:col-span-12">
+        <div className="flex items-center gap-2 flex-wrap bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
+          <span className="text-xs font-bold text-slate-600 dark:text-slate-400 ml-1">ميدات الربط:</span>
+          <div className="flex items-center gap-1 flex-wrap flex-1">
+            {strapFootingsInDb.length === 0 ? (
+              <span className="text-xs text-slate-400 italic">لا توجد ميدات ربط — اضغط "إضافة" لإنشاء واحدة</span>
+            ) : (
+              strapFootingsInDb.map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => setSelectedFootingId(f.id)}
+                  className={`px-3 py-1 rounded border text-[11px] font-bold transition-colors ${selectedFootingId === f.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950'}`}
+                >
+                  {f.name || f.id}
+                </button>
+              ))
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleAddNewStrap}
+              className="h-7 text-[11px] gap-1 text-emerald-700 border-emerald-300 hover:bg-emerald-50 dark:text-emerald-400 dark:border-emerald-700 dark:hover:bg-emerald-950"
+            >
+              <span className="text-base leading-none">+</span> إضافة ميدة
+            </Button>
+            {selectedFootingId && strapFootingsInDb.some(f => f.id === selectedFootingId) && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleDeleteStrap}
+                className="h-7 text-[11px] gap-1 text-red-600 border-red-300 hover:bg-red-50 dark:text-red-400 dark:border-red-700 dark:hover:bg-red-950"
+              >
+                <span className="text-base leading-none">×</span> حذف الحالية
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {strapFootingsInDb.length === 0 ? (
+        <div className="lg:col-span-12 flex items-center justify-center py-20 text-slate-400 text-sm">
+          لا توجد ميدات ربط. اضغط "إضافة ميدة" لبدء التصميم.
+        </div>
+      ) : (<>
+
       {/* 1. LEFT CONTROLS: MODELING INPUTS */}
       <div className="lg:col-span-4 space-y-6">
         <Card className="shadow-lg border-slate-200 dark:border-slate-800">
@@ -1017,6 +1063,8 @@ export default function StrapFootingAnalysisPanel({
         </Card>
 
       </div>
+
+      </>)}
 
     </div>
   );

@@ -259,8 +259,8 @@ function svgColumns(
     svg += `<rect x="${cx}" y="${cy}" width="${hw * 2}" height="${hh * 2}" fill="${fill}" stroke="black" stroke-width="1" />`;
     if (showLabels) {
       const groupLabel = groupLabels?.get(c.id);
-      // السطر الأول: رمز المجموعة + رقم العمود
-      const line1 = groupLabel ? `${groupLabel}(${c.id})` : c.id;
+      // السطر الأول: رمز المجموعة فقط (بدون رقم العنصر)
+      const line1 = groupLabel || c.id;
       // السطر الثاني: الأبعاد + مؤشر التدوير إن وجد
       const line2 = `${c.b}×${c.h}${isRotated ? ' ®' : ''}`;
       svg += `<text x="${tx(c.x) + hw + 5}" y="${ty(c.y) - 2}" font-size="7" font-weight="bold" font-family="Arial" fill="#000">${line1}</text>`;
@@ -424,17 +424,10 @@ function svgSlabsOnPlan(
     const xDir = xIsShort ? sd.design.shortDir : sd.design.longDir;
     const yDir = xIsShort ? sd.design.longDir : sd.design.shortDir;
 
-    const formattedX = `${xDir.bars}Φ${xDir.dia}/m`;
-    const formattedY = `${yDir.bars}Φ${yDir.dia}/m`;
-
-    // 1. اسم البلاطة بخط واضح وحجم مناسب وفي مكان مناسب في وسط البلاطة تماماً
-    svg += `<text x="${cx}" y="${cy - 11}" text-anchor="middle" font-size="9" font-weight="black" fill="#004000" font-family="'Segoe UI', Arial, sans-serif" letter-spacing="0.5">${s.id}</text>`;
-
-    // 2. حديد اتجاه X - أفقي
-    svg += `<text x="${cx}" y="${cy + 3}" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#1a3a5c" font-family="Arial">X: ${formattedX}</text>`;
-
-    // 3. حديد اتجاه Y - أفقي
-    svg += `<text x="${cx}" y="${cy + 14}" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#7b1a00" font-family="Arial">Y: ${formattedY}</text>`;
+    // اسم المجموعة فقط في وسط البلاطة (بدون تفاصيل التسليح — التسليح في جدول التسليح)
+    const groupLabel = groupLabels?.get(s.id);
+    const displayLabel = groupLabel || s.id;
+    svg += `<text x="${cx}" y="${cy + 4}" text-anchor="middle" font-size="9" font-weight="bold" fill="#004000" font-family="'Segoe UI', Arial, sans-serif" letter-spacing="0.5">${displayLabel}</text>`;
   }
   return svg;
 }
