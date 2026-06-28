@@ -119,6 +119,7 @@ export default function FoundationDesignPanel({
   const [fc, setFc] = useState(mat.fc || 25);
   const [fy, setFy] = useState(mat.fy || 420);
   const [qall, setQall] = useState(200); // Default soil bearing capacity changed to 200 kN/m²
+  const [barDiameter, setBarDiameter] = useState<number>(16); // Main rebar diameter (mm)
   const [includeSelfWeight, setIncludeSelfWeight] = useState(true);
   const [includeSoilCover, setIncludeSoilCover] = useState(true);
   const [soilCoverDepth, setSoilCoverDepth] = useState(1.2); // meters

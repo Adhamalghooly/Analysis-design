@@ -15,7 +15,7 @@ export interface SizingConstraints {
 }
 
 export interface SizingResultOption {
-  optionName: 'economical' | 'balanced' | 'conservative';
+  optionName: 'economical' | 'balanced' | 'conservative' | 'excel_direct';
   titleAr: string;
   titleEn: string;
   B: number;                 // mm
@@ -36,6 +36,7 @@ export interface AutoSizingOutput {
   economical: SizingResultOption;
   balanced: SizingResultOption;
   conservative: SizingResultOption;
+  excel_direct: SizingResultOption;
 }
 
 /**
@@ -295,11 +296,99 @@ export function solveFootingSizing(
     };
   };
 
-  // Run solver on all three tiers
+  /**
+   * Excel Direct Method — matches ACI 318-99 worksheet approach:
+   * 1. qna = qall − γavg × Df  (net allowable bearing, no safety target margins)
+   * 2. A_req = P_service / qna  → minimum footprint
+   * 3. Round up B & L to next step-size increment
+   * 4. Iterate H upward from 300 mm until punching & one-way shear both pass
+   */
+  const solveExcelDirect = (): SizingResultOption => {
+    const gamma_c_ed = baseInput.gammaConc ?? 24;
+    const gamma_s_ed = baseInput.gammaSoil ?? 18;
+    const Df_ed      = baseInput.soilCoverDepth ?? 0;
+    const gamma_avg_ed = (gamma_c_ed + gamma_s_ed) / 2;
+    const qna = Math.max(50, qall - gamma_avg_ed * Df_ed);
+
+    // Minimum footprint from service load
+    const A_req = P / qna; // m²
+    let B_ed: number, L_ed: number;
+
+    if (shapeType === 'square') {
+      const edge = Math.ceil(Math.sqrt(A_req) * 1000 / stepSize) * stepSize;
+      B_ed = L_ed = Math.max(600, edge);
+    } else if (shapeType === 'equal_cantilever') {
+      const dCol = (Cy - Cx) / 1000;
+      const solB = (-dCol + Math.sqrt(dCol * dCol + 4 * A_req)) / 2;
+      B_ed = Math.ceil(solB * 1000 / stepSize) * stepSize;
+      L_ed = B_ed + Math.round((Cy - Cx) / stepSize) * stepSize;
+    } else {
+      const aspect = Math.max(1.0, Cy / Math.max(1, Cx));
+      const solB = Math.sqrt(A_req / aspect);
+      B_ed = Math.ceil(solB * 1000 / stepSize) * stepSize;
+      L_ed = Math.ceil(solB * aspect * 1000 / stepSize) * stepSize;
+    }
+    B_ed = Math.min(maxWidth, Math.max(600, B_ed));
+    L_ed = Math.min(maxLength, Math.max(600, L_ed));
+
+    // Find minimum H (from 300 mm upward) where shear checks pass
+    let H_ed = 300;
+    let finalAnalysis_ed: IsolatedFootingAnalysisResult | null = null;
+    for (let iter = 0; iter < 80 && H_ed <= maxThickness; iter++) {
+      const test = analyzeIsolatedFooting({ ...baseInput, B: B_ed, L: L_ed, H: H_ed });
+      if (
+        test.soilPressure.qmax <= qall &&
+        test.criticalSections.punching_ok &&
+        test.criticalSections.wideShearX_ok &&
+        test.criticalSections.wideShearY_ok
+      ) {
+        finalAnalysis_ed = test;
+        break;
+      }
+      H_ed = Math.min(maxThickness, H_ed + stepSize);
+    }
+    if (!finalAnalysis_ed) {
+      finalAnalysis_ed = analyzeIsolatedFooting({ ...baseInput, B: B_ed, L: L_ed, H: H_ed });
+    }
+
+    const footingArea_ed = parseFloat(((B_ed / 1000) * (L_ed / 1000)).toFixed(2));
+    const concreteVol_ed = parseFloat((footingArea_ed * H_ed / 1000).toFixed(3));
+    const bearingUtil_ed = parseFloat((finalAnalysis_ed.soilPressure.qmax / qall).toFixed(3));
+    const punchUtil_ed   = parseFloat((finalAnalysis_ed.criticalSections.stress_punching / Math.max(0.1, finalAnalysis_ed.criticalSections.vc_punching)).toFixed(3));
+    const vcx_ed = finalAnalysis_ed.criticalSections.vc_wide * L_ed * (H_ed - 87);
+    const vcy_ed = finalAnalysis_ed.criticalSections.vc_wide * B_ed * (H_ed - 87);
+    const shearUtil_ed = parseFloat(Math.max(
+      finalAnalysis_ed.criticalSections.Vu_x / Math.max(1.0, vcx_ed / 1000),
+      finalAnalysis_ed.criticalSections.Vu_y / Math.max(1.0, vcy_ed / 1000)
+    ).toFixed(3));
+    const govMom_ed = Math.max(finalAnalysis_ed.criticalSections.designMomentX, finalAnalysis_ed.criticalSections.designMomentY);
+    const estRebar_ed = estimateReinforcement(govMom_ed, Math.min(B_ed, L_ed), H_ed, fc, fy);
+    const avgUtil_ed  = (bearingUtil_ed + punchUtil_ed + shearUtil_ed) / 3;
+    const eff_ed = Math.min(99, Math.max(30, Math.round(avgUtil_ed * 100 + (1.0 / (concreteVol_ed + 0.1)) * 5)));
+
+    return {
+      optionName: 'excel_direct',
+      titleAr: 'طريقة الإكسيل المباشرة',
+      titleEn: 'Excel Direct Method',
+      B: B_ed, L: L_ed, H: H_ed,
+      footingArea: footingArea_ed,
+      concreteVolume: concreteVol_ed,
+      bearingUtilization: bearingUtil_ed,
+      punchingUtilization: punchUtil_ed,
+      oneWayShearUtilization: shearUtil_ed,
+      estimatedRebarRatio: estRebar_ed.rebarRatio,
+      estimatedRebarWeightKg: estRebar_ed.rebarWeightKg,
+      overallEfficiency: eff_ed,
+      analysis: finalAnalysis_ed,
+    };
+  };
+
+  // Run solver on all four tiers
   return {
     economical: solveOption('economical'),
     balanced: solveOption('balanced'),
     conservative: solveOption('conservative'),
+    excel_direct: solveExcelDirect(),
   };
 }
 
