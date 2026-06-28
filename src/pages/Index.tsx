@@ -1,4 +1,4 @@
-import React, { useReducer, useMemo, useCallback, useEffect } from "react";
+import React, { useReducer, useMemo, useCallback, useEffect, useRef, useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -371,6 +371,9 @@ const Index = () => {
   const [designSource, setDesignSource] = React.useState<'app' | 'etabs'>('app');
   const [designExecuted, setDesignExecuted] = React.useState(false);
 
+  // Track which heavy tabs have been visited (for lazy mounting)
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set<string>(['projects']));
+
 
 
 
@@ -458,6 +461,16 @@ const Index = () => {
     return () => clearTimeout(t);
   }, [savedMessage]);
 
+  // Mark tabs as visited for lazy mounting of heavy panels
+  useEffect(() => {
+    setVisitedTabs(prev => {
+      if (prev.has(activeTab)) return prev;
+      const next = new Set(prev);
+      next.add(activeTab);
+      return next;
+    });
+  }, [activeTab]);
+
   // Keyboard shortcut: Ctrl+Z for undo
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -502,8 +515,12 @@ const Index = () => {
     loadLastActiveProject();
   }, []);
 
+  const _modelRebuildTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => {
-    if (mode === 'auto') {
+    if (mode !== 'auto') return;
+    // Debounce: wait 250ms after last change before rebuilding model
+    clearTimeout(_modelRebuildTimer.current);
+    _modelRebuildTimer.current = setTimeout(() => {
       modelManager.clear();
       const beamSection = modelManager.createSection('B-default', beamB, beamH, 'beam');
       const colSection = modelManager.createSection('C-default', colB, colH, 'column');
@@ -512,7 +529,6 @@ const Index = () => {
         slabs.map(s => ({ id: s.id, x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2, vertices: s.vertices })),
         beamSection, colSection, slabProps.thickness, colL / 1000
       );
-      // Reapply persisted frame end releases to modelManager nodes
       if (frameEndReleases) {
         for (const frame of modelManager.getAllFrames()) {
           const ni = modelManager.getNode(frame.nodeI);
@@ -530,7 +546,9 @@ const Index = () => {
         }
       }
       dispatch({ type: 'INC_MODEL_VERSION' });
-    }
+    }, 250);
+    return () => clearTimeout(_modelRebuildTimer.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slabs, beamB, beamH, colB, colH, colL, slabProps.thickness, mode, frameEndReleases]);
 
   const columns = useMemo(() => {
@@ -1726,6 +1744,11 @@ const Index = () => {
   }, [analyzed, columns, beamsWithLoads, frameResults]);
 
   const colDesigns = useMemo(() => {
+    if (!analyzed && !(designSource === 'etabs' && etabsColumnResults.length > 0)) {
+      return columns.filter(c => !c.isRemoved).map(c => ({
+        ...c, Pu: 0, Mx: 0, My: 0, Mu: 0, design: null as any,
+      }));
+    }
     if (designSource === 'etabs' && etabsColumnResults.length > 0) {
       return columns.filter(c => !c.isRemoved).map(c => {
         const storyForCol = stories.find(s => s.id === c.storyId);
@@ -1903,10 +1926,10 @@ const Index = () => {
     }).filter(Boolean) as FrameBentUpResult[];
   }, [analyzed, frames, beamsWithLoads, frameResults, mat, detectedConnections, splitBeamGroups]);
 
-  const slabDesigns = useMemo(() =>
-    slabs.map(s => ({ ...s, design: designSlab(s, slabProps, mat, slabs, columns) })),
-    [slabs, slabProps, mat, columns]
-  );
+  const slabDesigns = useMemo(() => {
+    if (!analyzed) return slabs.map(s => ({ ...s, design: null as any }));
+    return slabs.map(s => ({ ...s, design: designSlab(s, slabProps, mat, slabs, columns) }));
+  }, [analyzed, slabs, slabProps, mat, columns]);
 
   const handleCanvasClick = useCallback((x: number, y: number) => {
     if (activeTool === 'node') {
@@ -3385,7 +3408,7 @@ const Index = () => {
               columns={columns}
               beamDesigns={beamDesigns as any}
               colDesigns={colDesigns}
-              slabDesigns={slabs.map(s => ({ ...s, design: designSlab(s, slabProps, mat, slabs, columns) })) as any}
+              slabDesigns={slabDesigns as any}
               slabProps={slabProps}
               analyzed={hasDesignResults}
               foundationResults={foundationResults.length > 0 ? foundationResults : undefined}
@@ -3435,94 +3458,97 @@ const Index = () => {
                 </CardContent>
               </Card>
 
-              {/* BOQ - Bill of Quantities */}
-              <BOQPanel
-                stories={stories}
-                slabs={slabs}
-                beams={beamsWithLoads}
-                columns={columns}
-                beamDesigns={beamDesigns as any}
-                colDesigns={colDesigns}
-                slabDesigns={slabs.map(s => ({ ...s, design: designSlab(s, slabProps, mat, slabs, columns) })) as any}
-                slabProps={slabProps}
-                analyzed={hasDesignResults}
-                foundationResults={foundationResults.length > 0 ? foundationResults : undefined}
-                foundationMat={foundationMat}
-              />
-              
-              {/* One-Way Ribbed Slab Detailing and Drawings Section */}
-              {hasDesignResults && slabs.some(s => s.slabType === 'one_way_ribbed') && (
-                <RibbedSlabDrawingsPanel
+              {/* Heavy export panels — lazy mount: only render after first visit to export tab */}
+              {visitedTabs.has('export') && <>
+                {/* BOQ - Bill of Quantities */}
+                <BOQPanel
+                  stories={stories}
                   slabs={slabs}
-                  slabProps={slabProps}
-                  mat={mat}
-                  ribbedSlabProps={state.ribbedSlabProps}
-                  columns={columns}
                   beams={beamsWithLoads}
+                  columns={columns}
+                  beamDesigns={beamDesigns as any}
+                  colDesigns={colDesigns}
+                  slabDesigns={slabDesigns as any}
+                  slabProps={slabProps}
+                  analyzed={hasDesignResults}
+                  foundationResults={foundationResults.length > 0 ? foundationResults : undefined}
+                  foundationMat={foundationMat}
+                />
+
+                {/* One-Way Ribbed Slab Detailing and Drawings Section */}
+                {hasDesignResults && slabs.some(s => s.slabType === 'one_way_ribbed') && (
+                  <RibbedSlabDrawingsPanel
+                    slabs={slabs}
+                    slabProps={slabProps}
+                    mat={mat}
+                    ribbedSlabProps={state.ribbedSlabProps}
+                    columns={columns}
+                    beams={beamsWithLoads}
+                    projectName={titleBlockConfig.projectName || 'Structural Design Studio'}
+                    titleBlockConfig={titleBlockConfig}
+                  />
+                )}
+
+                {/* Superstructure Coordinated Drawings and Framing CAD Sheet Module */}
+                <StructuralDrawingsModule
+                  stories={stories}
+                  activeStoryId={selectedStoryId}
+                  slabs={slabs}
+                  beams={beamsWithLoads}
+                  columns={columns}
+                  beamDesigns={beamDesigns as any}
+                  colDesigns={colDesigns}
+                  slabDesigns={slabDesigns as any}
+                  mat={mat}
+                  slabProps={slabProps}
                   projectName={titleBlockConfig.projectName || 'Structural Design Studio'}
                   titleBlockConfig={titleBlockConfig}
+                  analyzed={hasDesignResults}
+                  foundationResults={foundationResults}
+                  foundationMat={foundationMat}
+                  bentUpResults={bentUpResults}
+                  ribbedSlabProps={state.ribbedSlabProps}
+                  colLoads3D={colLoads3D}
+                  onUpdateTitleBlock={(config) => dispatch({ type: 'SET_TITLE_BLOCK_CONFIG', config })}
                 />
-              )}
 
-              {/* Superstructure Coordinated Drawings and Framing CAD Sheet Module */}
-              <StructuralDrawingsModule
-                stories={stories}
-                activeStoryId={selectedStoryId}
-                slabs={slabs}
-                beams={beamsWithLoads}
-                columns={columns}
-                beamDesigns={beamDesigns as any}
-                colDesigns={colDesigns}
-                slabDesigns={slabs.map(s => ({ ...s, design: designSlab(s, slabProps, mat, slabs, columns) })) as any}
-                mat={mat}
-                slabProps={slabProps}
-                projectName={titleBlockConfig.projectName || 'Structural Design Studio'}
-                titleBlockConfig={titleBlockConfig}
-                analyzed={hasDesignResults}
-                foundationResults={foundationResults}
-                foundationMat={foundationMat}
-                bentUpResults={bentUpResults}
-                ribbedSlabProps={state.ribbedSlabProps}
-                colLoads3D={colLoads3D}
-                onUpdateTitleBlock={(config) => dispatch({ type: 'SET_TITLE_BLOCK_CONFIG', config })}
-              />
+                {/* Coordinated Foundations Blueprint Drawings Panel */}
+                <FoundationDrawingsExportPanel
+                  columns={columns}
+                  colLoads3D={colLoads3D}
+                  fc={mat.fc}
+                  fy={mat.fy}
+                  projectName={titleBlockConfig.projectName || 'Structural Design Studio'}
+                  titleBlockConfig={titleBlockConfig}
+                  analyzed={hasDesignResults}
+                  foundationResults={foundationResults}
+                  foundationMat={foundationMat}
+                  foundationDb={state.foundationDb}
+                  fdnAssignments={state.fdnAssignments}
+                  stripFootingsList={state.stripFootingsList}
+                />
 
-              {/* Coordinated Foundations Blueprint Drawings Panel (Foundations Drawings & Export) */}
-              <FoundationDrawingsExportPanel
-                columns={columns}
-                colLoads3D={colLoads3D}
-                fc={mat.fc}
-                fy={mat.fy}
-                projectName={titleBlockConfig.projectName || 'Structural Design Studio'}
-                titleBlockConfig={titleBlockConfig}
-                analyzed={hasDesignResults}
-                foundationResults={foundationResults}
-                foundationMat={foundationMat}
-                foundationDb={state.foundationDb}
-                fdnAssignments={state.fdnAssignments}
-                stripFootingsList={state.stripFootingsList}
-              />
-
-              {/* Main Export Panel with Floor Selector */}
-              <ExportPanel
-                stories={stories}
-                slabs={slabs}
-                beams={beamsWithLoads}
-                columns={columns}
-                beamDesigns={beamDesigns as any}
-                colDesigns={colDesigns}
-                slabDesigns={slabs.map(s => ({ ...s, design: designSlab(s, slabProps, mat, slabs, columns) }))}
-                mat={mat}
-                slabProps={slabProps}
-                projectName={titleBlockConfig.projectName || 'Structural Design Studio'}
-                titleBlockConfig={titleBlockConfig}
-                analyzed={hasDesignResults}
-                foundationResults={foundationResults}
-                foundationMat={foundationMat}
-                bentUpResults={bentUpResults}
-                ribbedSlabProps={state.ribbedSlabProps}
-                colLoads3D={colLoads3D}
-              />
+                {/* Main Export Panel with Floor Selector */}
+                <ExportPanel
+                  stories={stories}
+                  slabs={slabs}
+                  beams={beamsWithLoads}
+                  columns={columns}
+                  beamDesigns={beamDesigns as any}
+                  colDesigns={colDesigns}
+                  slabDesigns={slabDesigns}
+                  mat={mat}
+                  slabProps={slabProps}
+                  projectName={titleBlockConfig.projectName || 'Structural Design Studio'}
+                  titleBlockConfig={titleBlockConfig}
+                  analyzed={hasDesignResults}
+                  foundationResults={foundationResults}
+                  foundationMat={foundationMat}
+                  bentUpResults={bentUpResults}
+                  ribbedSlabProps={state.ribbedSlabProps}
+                  colLoads3D={colLoads3D}
+                />
+              </>}
 
               {/* Additional quick export buttons */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -3530,8 +3556,7 @@ const Index = () => {
                   <CardHeader><CardTitle className="text-sm">تقرير PDF</CardTitle></CardHeader>
                   <CardContent className="space-y-2">
                     <Button className="w-full min-h-[44px]" disabled={!hasDesignResults} onClick={() => {
-                      const slabDesignsData = slabs.map(s => ({ ...s, design: designSlab(s, slabProps, mat, slabs, columns) }));
-                      generateStructuralReport(slabs, beamsWithLoads, columns, frames, frameResults, beamDesigns as any, colDesigns, slabDesignsData, mat, slabProps, 'Structural Design Studio', stories);
+                      generateStructuralReport(slabs, beamsWithLoads, columns, frames, frameResults, beamDesigns as any, colDesigns, slabDesigns, mat, slabProps, 'Structural Design Studio', stories);
                     }}>تقرير التصميم الإنشائي</Button>
                   </CardContent>
                 </Card>
@@ -3634,10 +3659,14 @@ const Index = () => {
             <GlobalFrameSolverPanel />
           </TabsContent>
 
-          {/* FOUNDATION DESIGN TAB */}
+          {/* FOUNDATION DESIGN TAB — lazy mount: only render after first visit */}
           <TabsContent value="foundations" className="flex-1 overflow-y-auto mt-0 pb-20 md:pb-4 p-3 md:p-4 bg-muted/10">
             <div className="space-y-4 max-w-7xl mx-auto">
-              <FoundationDesignPanel
+              {!visitedTabs.has('foundations') ? (
+                <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
+                  جارٍ التحميل...
+                </div>
+              ) : <FoundationDesignPanel
                 columns={columns}
                 beams={beamsWithLoads}
                 supportDb={state.supportDb}
@@ -3656,7 +3685,7 @@ const Index = () => {
                 onFdnAssignmentsChange={(asg) => dispatch({ type: 'SET_FDN_ASSIGNMENTS', assignments: asg })}
                 stripFootingsList={state.stripFootingsList}
                 onStripFootingsChange={(list) => dispatch({ type: 'SET_STRIP_FOOTINGS_LIST', list: list })}
-              />
+              />}
             </div>
           </TabsContent>
 

@@ -2,3 +2,4 @@
 - [Test Infrastructure](test-infra.md) — vitest config, test locations, and exact FEM function signatures that tripped early tests.
 - [Store Architecture Decision](store-architecture.md) — Zustand stores in src/stores/ mirror AppState domains; Index.tsx not yet split.
 - [Drawing System Unification](drawing-system-unification.md) — Phases 1,4,5 complete; LINE_WEIGHTS canonical in drawingStandards.ts; DXF upgraded to LWPOLYLINE+HATCH; FoundationDrawingsWorkspace created.
+- [Performance Optimization](performance-optimization.md) — 5 root causes of 1-min freeze fixed: inline designSlab in JSX, missing analyzed guards on slabDesigns/colDesigns, undbounced model rebuild, always-mounted heavy panels.
