@@ -260,18 +260,20 @@ export default function FoundationDesignPanel({
   const [interactivefxCol, setInteractivefxCol] = useState<number>(0);
   const [interactivefyCol, setInteractivefyCol] = useState<number>(0);
 
-  // Manual loads overrides input
-  const [customP, setCustomP] = useState<number>(200);
+  // Manual loads overrides input — separated into Dead Load and Live Load
+  const [customPDL, setCustomPDL] = useState<number>(120); // Dead Load axial (kN)
+  const [customPLL, setCustomPLL] = useState<number>(80);  // Live Load axial (kN)
   const [customMx, setCustomMx] = useState<number>(0);
   const [customMy, setCustomMy] = useState<number>(0);
   const [customVx, setCustomVx] = useState<number>(0);
   const [customVy, setCustomVy] = useState<number>(0);
   const [useCustomLoads, setUseCustomLoads] = useState<boolean>(false);
 
-  // Sync with analysis imports if not using custom loads
+  // Sync with analysis imports if not using custom loads (split P as 60% DL / 40% LL)
   useEffect(() => {
     if (!useCustomLoads) {
-      setCustomP(selectedColLoads.P);
+      setCustomPDL(parseFloat((selectedColLoads.P * 0.6).toFixed(1)));
+      setCustomPLL(parseFloat((selectedColLoads.P * 0.4).toFixed(1)));
       setCustomMx(selectedColLoads.Mx);
       setCustomMy(selectedColLoads.My);
       setCustomVx(selectedColLoads.Vx);
@@ -459,7 +461,7 @@ export default function FoundationDesignPanel({
       soilCoverDepth,
       gammaConc,
       gammaSoil,
-      P: customP,
+      P: customPDL + customPLL,
       Mx: customMx,
       My: customMy,
       Vx: customVx,
@@ -468,7 +470,7 @@ export default function FoundationDesignPanel({
   }, [
     interactiveB, interactiveL, interactiveH, interactiveCx, interactiveCy,
     interactivefxCol, interactivefyCol, fc, qall, includeSelfWeight, includeSoilCover,
-    soilCoverDepth, gammaConc, gammaSoil, customP, customMx, customMy, customVx, customVy
+    soilCoverDepth, gammaConc, gammaSoil, customPDL, customPLL, customMx, customMy, customVx, customVy
   ]);
 
   const analysisResult: IsolatedFootingAnalysisResult = useMemo(() => {
@@ -495,7 +497,7 @@ export default function FoundationDesignPanel({
         B: interactiveB / 1000, // convert mm to m
         L: interactiveL / 1000, // convert mm to m
         H: interactiveH / 1000, // convert mm to m
-        P: useCustomLoads ? customP : selectedColLoads.P,
+        P: useCustomLoads ? (customPDL + customPLL) : selectedColLoads.P,
         Mx: useCustomLoads ? customMx : selectedColLoads.Mx,
         My: useCustomLoads ? customMy : selectedColLoads.My
       }, geoParams, 'elastic', { maxS: 25, maxBeta: 1 / 300 });
@@ -503,12 +505,12 @@ export default function FoundationDesignPanel({
       console.error("Geotechnical isolated settlement calculation failed:", err);
       return null;
     }
-  }, [selectedColId, interactiveB, interactiveL, interactiveH, useCustomLoads, customP, customMx, customMy, selectedColLoads, qall, soilCoverDepth]);
+  }, [selectedColId, interactiveB, interactiveL, interactiveH, useCustomLoads, customPDL, customPLL, customMx, customMy, selectedColLoads, qall, soilCoverDepth]);
 
   // --- Auto Sizing Reactive Solver ---
   const sizingInputForSizer = useMemo(() => {
     return {
-      P: useCustomLoads ? customP : selectedColLoads.P,
+      P: useCustomLoads ? (customPDL + customPLL) : selectedColLoads.P,
       Mx: useCustomLoads ? customMx : selectedColLoads.Mx,
       My: useCustomLoads ? customMy : selectedColLoads.My,
       Vx: useCustomLoads ? customVx : selectedColLoads.Vx,
@@ -527,10 +529,20 @@ export default function FoundationDesignPanel({
       fy,
     };
   }, [
-    useCustomLoads, customP, selectedColLoads, customMx, customMy, customVx, customVy,
+    useCustomLoads, customPDL, customPLL, selectedColLoads, customMx, customMy, customVx, customVy,
     interactiveCx, interactiveCy, interactivefxCol, interactivefyCol, fc, qall,
     includeSelfWeight, includeSoilCover, soilCoverDepth, gammaConc, gammaSoil, fy
   ]);
+
+  // Effective load factor: Pu = 1.2×DL + 1.6×LL  (ACI 318-19 §5.3.1)
+  // Expressed as a multiplier on total service load P = DL + LL
+  const effectiveLoadFactor = useMemo(() => {
+    const pDL = useCustomLoads ? customPDL : selectedColLoads.P * 0.6;
+    const pLL = useCustomLoads ? customPLL : selectedColLoads.P * 0.4;
+    const pTotal = pDL + pLL;
+    if (pTotal <= 0) return 1.4;
+    return parseFloat(((1.2 * pDL + 1.6 * pLL) / pTotal).toFixed(4));
+  }, [useCustomLoads, customPDL, customPLL, selectedColLoads.P]);
 
   const sizingResult: AutoSizingOutput = useMemo(() => {
     return solveFootingSizing(sizingInputForSizer, {
@@ -1186,14 +1198,32 @@ export default function FoundationDesignPanel({
                 <div className="space-y-2 border-t border-border pt-3">
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
-                      <span className="text-[10px] text-muted-foreground font-mono">P (Axial, kN)</span>
+                      <span className="text-[10px] text-muted-foreground font-mono">P_DL (ميت، kN)</span>
                       <Input
                         type="number"
                         disabled={!useCustomLoads}
-                        value={customP}
-                        onChange={(e) => setCustomP(parseFloat(e.target.value) || 0)}
+                        value={customPDL}
+                        onChange={(e) => setCustomPDL(parseFloat(e.target.value) || 0)}
                         className="h-8 font-mono text-xs"
                       />
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-muted-foreground font-mono">P_LL (حي، kN)</span>
+                      <Input
+                        type="number"
+                        disabled={!useCustomLoads}
+                        value={customPLL}
+                        onChange={(e) => setCustomPLL(parseFloat(e.target.value) || 0)}
+                        className="h-8 font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-[10px] text-muted-foreground font-mono">P_total = {(customPDL + customPLL).toFixed(1)} kN</span>
+                      <div className="h-8 font-mono text-xs bg-muted/40 border border-border rounded px-2 flex items-center text-muted-foreground">
+                        Pu = {(1.2 * customPDL + 1.6 * customPLL).toFixed(1)} kN
+                      </div>
                     </div>
                     <div>
                       <span className="text-[10px] text-muted-foreground font-mono">fc' (MPa)</span>
@@ -2395,7 +2425,7 @@ export default function FoundationDesignPanel({
                 <IsolatedFootingDesignView
                   analysisResult={analysisResult}
                   fy={fy}
-                  loadFactor={1.5}
+                  loadFactor={effectiveLoadFactor}
                 />
               </div>
             </div>
@@ -2428,7 +2458,7 @@ export default function FoundationDesignPanel({
                 <IsolatedFootingDetailingView
                   analysisResult={analysisResult}
                   fy={fy}
-                  loadFactor={1.5}
+                  loadFactor={effectiveLoadFactor}
                   columns={isolatedCols}
                   colLoads3D={colLoads3D}
                   fc={fc}

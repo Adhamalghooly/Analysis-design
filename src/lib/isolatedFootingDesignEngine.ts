@@ -51,6 +51,11 @@ export interface FlexuralDesignResult {
   selectedSpacing: number;    // mm
   AsProvided: number;        // mm²
   barsLayout: FootingBar;
+  // ACI 318 §13.3.3.3 Band reinforcement (short-direction only)
+  isBandDirection: boolean;  // true when this is the short-direction that needs banding
+  bandFraction: number;      // 2/(1+long/short) — fraction of bars in central band
+  barsInBand: number;        // bars placed in central band of width = short dimension
+  barsOutsideBand: number;   // bars per outer zone (each side of central band)
 }
 
 export interface ShearDesignResult {
@@ -251,6 +256,36 @@ export function designIsolatedFootingStrength(
     const a = (bestAsProvided * fy) / (0.85 * fc * totalSpan);
     const Mn_provided = bestAsProvided * fy * (d_eff - a / 2) * 1e-6; // kN·m
     const phiMn = phiFlexure * Mn_provided;
+
+    // --- ACI 318 §13.3.3.3 Band Reinforcement (short-direction concentration) ---
+    // For rectangular footings (L ≠ B), concentrate short-direction bars in a
+    // central band of width equal to the short footing dimension.
+    // Band fraction γ = 2 / (1 + long/short)
+    // Bars in band = ⌈γ × n_total⌉; remaining bars split equally in outer zones.
+    const LB_ratio = L / B; // L/B ≥ 1 when L is the long side
+    let isBandDirection = false;
+    let bandFraction = 0;
+    let barsInBand = bestQty;
+    let barsOutsideBand = 0;
+
+    const applyBand = (ratio: number) => {
+      isBandDirection = true;
+      bandFraction = parseFloat((2 / (1 + ratio)).toFixed(4));
+      let nBand = Math.ceil(bandFraction * bestQty);
+      let nOuter = bestQty - nBand;
+      // Ensure symmetric outer zones (each side equal) — absorb odd remainder into band
+      if (nOuter % 2 !== 0) { nBand += 1; nOuter -= 1; }
+      barsInBand = nBand;
+      barsOutsideBand = nOuter / 2; // bars per outer zone (each side of central band)
+    };
+
+    if (LB_ratio > 1.01 && direction === 'Y') {
+      // L is long side; Y-bars distribute over B (the short dimension) → apply band
+      applyBand(LB_ratio);
+    } else if (LB_ratio < 0.99 && direction === 'X') {
+      // B is long side; X-bars distribute over L (the short dimension) → apply band
+      applyBand(B / L);
+    }
     
     // Generate detailing rebar coordinates
     const barLength = (direction === 'X' ? B : L) - 2 * cover;
@@ -300,7 +335,11 @@ export function designIsolatedFootingStrength(
       selectedQuantity: bestQty,
       selectedSpacing: bestSpacing,
       AsProvided: parseFloat(bestAsProvided.toFixed(1)),
-      barsLayout: footingBars
+      barsLayout: footingBars,
+      isBandDirection,
+      bandFraction,
+      barsInBand,
+      barsOutsideBand
     };
   };
 

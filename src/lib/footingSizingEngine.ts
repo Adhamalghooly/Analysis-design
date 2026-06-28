@@ -112,7 +112,16 @@ export function solveFootingSizing(
 
     // 1. Initial size estimation based on service loads
     const P_service_est = P + Math.max(10, 0.08 * P); // scale up for self weight guess
-    const reqFootprintArea = P_service_est / qall; // m²
+
+    // Net allowable bearing capacity per Excel practice:
+    // qna = qall - γa × Df   where γa = (γc + γs) / 2  (average overburden unit weight)
+    const gamma_c_sz = baseInput.gammaConc ?? 24;
+    const gamma_s_sz = baseInput.gammaSoil ?? 18;
+    const Df_sz = baseInput.soilCoverDepth ?? 0;
+    const gamma_avg_sz = (gamma_c_sz + gamma_s_sz) / 2;
+    const q_net_allow = Math.max(50, qall - gamma_avg_sz * Df_sz);
+
+    const reqFootprintArea = P_service_est / q_net_allow; // m²
 
     let startB = 1000;
     let startL = 1000;
